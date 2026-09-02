@@ -1,2 +1,6 @@
 node_modules/
 .turbo/
+
+# Python caches
+__pycache__/
+*.py[cod]
