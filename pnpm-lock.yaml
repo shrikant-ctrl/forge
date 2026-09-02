@@ -12,6 +12,8 @@ importers:
         specifier: latest
         version: 2.10.12
 
+  apps/api: {}
+
   apps/web:
     dependencies:
       '@tailwindcss/vite':

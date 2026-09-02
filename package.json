@@ -18,5 +18,11 @@
   "packageManager": "pnpm@10.32.1",
   "devDependencies": {
     "turbo": "latest"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "lightningcss"
+    ]
   }
 }
