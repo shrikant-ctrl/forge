@@ -2,7 +2,10 @@
   "name": "api",
   "private": true,
   "scripts": {
-    "dev": "uv run fastapi dev app/main.py",
+    "dev": "uv run prisma db push && uv run fastapi dev app/main.py",
+    "db:push": "uv run prisma db push",
+    "db:generate": "uv run prisma generate",
+    "db:studio": "uv run prisma studio",
     "lint": "uv run ruff check .",
     "format": "uv run ruff format ."
   }
