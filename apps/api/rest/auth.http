@@ -1,0 +1,52 @@
+### ─── Auth Module ────────────────────────────────────────────
+# Full auth flow. All responses are chained — no copy-pasting.
+#
+# WORKFLOW: Run requests top-to-bottom.
+# The token from Login is automatically used in /me.
+
+@BASE_URL = http://localhost:8000
+
+###
+# @name Register
+# POST /api/auth/register
+# Run once to create your account. Skip if already registered.
+#
+# 201 → { id, email, name, role, storageQuota, usedStorage, createdAt }
+# 409 → Email already registered
+POST {{BASE_URL}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "alice@company.com",
+  "password": "supersecret123",
+  "name": "Alice Johnson"
+}
+
+###
+# @name Login
+# POST /api/auth/login
+# Run this first — all requests below auto-use this token.
+#
+# 200 → { accessToken, tokenType, expiresIn }
+POST {{BASE_URL}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@company.com",
+  "password": "supersecret123"
+}
+
+###
+# Token is extracted automatically from the Login response above.
+@TOKEN = {{Login.response.body.$.accessToken}}
+
+###
+# @name GetMyProfile
+# GET /api/auth/me
+# Uses the token from the Login response above — no paste needed.
+#
+# 200 → { id, email, name, role, storageQuota, usedStorage, createdAt }
+# 401 → Token missing or invalid
+GET {{BASE_URL}}/api/auth/me
+Authorization: Bearer {{TOKEN}}
+Accept: application/json

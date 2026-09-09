@@ -1,0 +1,221 @@
+### ─── Files Module ───────────────────────────────────────────
+# Full upload/download flow + CRUD with automatic token + ID chaining.
+#
+# WORKFLOW: Run requests top-to-bottom.
+#   1. Login           → token auto-captured
+#   2. CreateFolder    → folder ID auto-captured (optional)
+#   3. InitUpload      → fileId + uploadUrl auto-captured
+#   4. UploadToS3      → PUT actual bytes to MinIO (uses uploadUrl)
+#   5. CompleteUpload  → finalizes the record in DB
+#   6. List, Get, Download, Update, Delete
+
+@BASE_URL = http://localhost:8000
+
+###
+# @name Login
+# Logs in and captures the token — runs once, used by everything below.
+POST {{BASE_URL}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@company.com",
+  "password": "supersecret123"
+}
+
+###
+@TOKEN = {{Login.response.body.$.accessToken}}
+
+###
+# @name CreateFolder
+# Creates a folder to upload into (optional — skip if uploading to root).
+POST {{BASE_URL}}/api/folders
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": "Project Files"
+}
+
+###
+@FOLDER_ID = {{CreateFolder.response.body.$.id}}
+
+
+### ─── Step 1: Initialize Upload ─────────────────────────────
+
+###
+# @name InitUpload
+# POST /api/files/init-upload
+# Validates quota, registers a pending File record, returns a presigned PUT URL.
+# fileId and uploadUrl are auto-captured for the next two steps.
+#
+# 201 → { fileId, storageKey, uploadUrl, expiresIn }
+# 403 → Storage quota exceeded
+POST {{BASE_URL}}/api/files/init-upload
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": "architecture-diagram.pdf",
+  "sizeBytes": 204800,
+  "mimeType": "application/pdf",
+  "folderId": "{{FOLDER_ID}}"
+}
+
+###
+@FILE_ID = {{InitUpload.response.body.$.fileId}}
+@UPLOAD_URL = {{InitUpload.response.body.$.uploadUrl}}
+
+
+### ─── Step 2: Upload Bytes to MinIO/S3 ──────────────────────
+
+###
+# @name UploadToS3
+# PUT <uploadUrl>
+# Uploads file bytes directly to MinIO using the presigned URL above.
+# uploadUrl is auto-filled from InitUpload — no copy-paste needed.
+#
+# For local dev we send a text payload as a placeholder.
+# In real usage the client sends the actual binary file bytes.
+#
+# 200 → Empty body (MinIO does not return JSON)
+PUT {{UPLOAD_URL}}
+Content-Type: application/pdf
+
+This is placeholder content for local dev testing. Replace with real binary in production.
+
+
+### ─── Step 3: Complete Upload ───────────────────────────────
+
+###
+# @name CompleteUpload
+# POST /api/files/complete-upload
+# Confirms the upload, creates FileVersion v1, updates quota usage.
+# fileId is auto-filled from InitUpload response.
+#
+# 200 → { id, name, sizeBytes, mimeType, folderId, ownerId, createdAt, updatedAt }
+# 403 → Not your file
+# 404 → File not found
+POST {{BASE_URL}}/api/files/complete-upload
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "fileId": "{{FILE_ID}}"
+}
+
+
+### ─── List & Search ──────────────────────────────────────────
+
+###
+# @name ListAllFiles
+# GET /api/files
+# Lists all non-deleted files owned by the current user.
+#
+# 200 → FileResponseDto[]
+GET {{BASE_URL}}/api/files
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###
+# @name ListFilesInFolder
+# GET /api/files?folderId=<id>
+# Lists files inside the folder created above.
+GET {{BASE_URL}}/api/files?folderId={{FOLDER_ID}}
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###
+# @name SearchFiles
+# GET /api/files?search=<query>
+# Searches files by name substring (case-insensitive).
+GET {{BASE_URL}}/api/files?search=architecture
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###
+# @name SearchInFolder
+# Combine folder filter + name search.
+GET {{BASE_URL}}/api/files?folderId={{FOLDER_ID}}&search=architecture
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+
+### ─── Get ────────────────────────────────────────────────────
+
+###
+# @name GetFile
+# GET /api/files/{id}
+# Gets metadata for the file uploaded above.
+#
+# 200 → FileResponseDto
+# 403 → Not your file
+# 404 → File not found
+GET {{BASE_URL}}/api/files/{{FILE_ID}}
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###
+# @name GetDownloadUrl
+# GET /api/files/{id}/download-url
+# Returns a short-lived presigned GET URL for direct browser download.
+# Copy the `downloadUrl` and open it in your browser to download the file.
+#
+# 200 → { downloadUrl, filename, expiresIn }
+GET {{BASE_URL}}/api/files/{{FILE_ID}}/download-url
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+
+### ─── Update ─────────────────────────────────────────────────
+
+###
+# @name RenameFile
+# PATCH /api/files/{id}
+# Renames the file. All fields are optional.
+#
+# 200 → FileResponseDto
+PATCH {{BASE_URL}}/api/files/{{FILE_ID}}
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": "architecture-diagram-v2.pdf"
+}
+
+###
+# @name MoveFileToRoot
+# PATCH /api/files/{id}
+# Moves the file to root (no folder).
+PATCH {{BASE_URL}}/api/files/{{FILE_ID}}
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "folderId": null
+}
+
+###
+# @name MoveFileBackToFolder
+# PATCH /api/files/{id}
+# Moves the file back into the folder.
+PATCH {{BASE_URL}}/api/files/{{FILE_ID}}
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "folderId": "{{FOLDER_ID}}"
+}
+
+
+### ─── Delete ─────────────────────────────────────────────────
+
+###
+# @name DeleteFile
+# DELETE /api/files/{id}
+# Soft-deletes the file. Returns 204 No Content.
+#
+# 204 → Deleted
+# 403 → Not your file
+# 404 → File not found
+DELETE {{BASE_URL}}/api/files/{{FILE_ID}}
+Authorization: Bearer {{TOKEN}}

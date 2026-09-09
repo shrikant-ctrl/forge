@@ -1,0 +1,19 @@
+### ─── Health & Root ──────────────────────────────────────────
+# Checks the server is alive and PostgreSQL is connected.
+# Run this first to confirm the backend is up before anything else.
+
+@BASE_URL = http://localhost:8000
+
+###
+# @name RootCheck
+# GET /
+# → { "message": "Forge Internal File Hub API" }
+GET {{BASE_URL}}/
+Accept: application/json
+
+###
+# @name HealthCheck
+# GET /health
+# → { "status": "ok", "database": "connected" }
+GET {{BASE_URL}}/health
+Accept: application/json

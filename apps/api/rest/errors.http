@@ -1,0 +1,184 @@
+### ─── Error Scenarios ────────────────────────────────────────
+# Validates that the NestJS-style error envelope is correct.
+# All errors should return:
+# {
+#   "statusCode": <int>,
+#   "message": "<string>",
+#   "error": "<string>",
+#   "details": null,
+#   "timestamp": "<ISO8601>",
+#   "path": "<string>"
+# }
+
+@BASE_URL = http://localhost:8000
+@TOKEN = PASTE_YOUR_TOKEN_HERE
+
+
+### ─── 401 Unauthorized ──────────────────────────────────────
+
+###
+# @name NoToken
+# Any protected endpoint without a token → 401
+GET {{BASE_URL}}/api/auth/me
+Accept: application/json
+
+###
+# @name InvalidToken
+# Malformed / expired JWT → 401
+GET {{BASE_URL}}/api/auth/me
+Authorization: Bearer this.is.not.a.valid.jwt
+Accept: application/json
+
+
+### ─── 404 Not Found ─────────────────────────────────────────
+
+###
+# @name FolderNotFound
+# Non-existent folder ID → 404
+GET {{BASE_URL}}/api/folders/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###
+# @name FileNotFound
+# Non-existent file ID → 404
+GET {{BASE_URL}}/api/files/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###
+# @name DownloadUrlForMissingFile
+GET {{BASE_URL}}/api/files/00000000-0000-0000-0000-000000000000/download-url
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+
+### ─── 409 Conflict ───────────────────────────────────────────
+
+###
+# @name DuplicateEmailRegistration
+# Registering with an already-used email → 409
+POST {{BASE_URL}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "alice@company.com",
+  "password": "supersecret123",
+  "name": "Alice Again"
+}
+
+
+### ─── 401 Wrong Credentials ─────────────────────────────────
+
+###
+# @name WrongPassword
+# Correct email, wrong password → 401
+POST {{BASE_URL}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@company.com",
+  "password": "wrongpassword!"
+}
+
+###
+# @name NonExistentUser
+POST {{BASE_URL}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "nobody@company.com",
+  "password": "somepassword"
+}
+
+
+### ─── 422 Validation Errors ─────────────────────────────────
+
+###
+# @name RegisterPasswordTooShort
+# Password < 8 chars → 422 Unprocessable Entity
+POST {{BASE_URL}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "short@company.com",
+  "password": "123",
+  "name": "Short Pass"
+}
+
+###
+# @name RegisterInvalidEmail
+POST {{BASE_URL}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "password": "validpassword123",
+  "name": "Bad Email"
+}
+
+###
+# @name RegisterNameTooShort
+# name < 2 chars → 422
+POST {{BASE_URL}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "x@company.com",
+  "password": "validpassword123",
+  "name": "A"
+}
+
+###
+# @name CreateFolderEmptyName
+# name min_length=1, empty string → 422
+POST {{BASE_URL}}/api/folders
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": ""
+}
+
+###
+# @name InitUploadZeroBytes
+# sizeBytes must be > 0 → 422
+POST {{BASE_URL}}/api/files/init-upload
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": "empty.txt",
+  "sizeBytes": 0,
+  "mimeType": "text/plain"
+}
+
+###
+# @name InitUploadMissingFields
+# Missing required fields → 422 with field-level detail
+POST {{BASE_URL}}/api/files/init-upload
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": "incomplete-file.pdf"
+}
+
+
+### ─── 403 Forbidden (Access to Other User's Resources) ──────
+# To test these, create resources with one user's token, then
+# try to access them with another user's token.
+
+###
+# @name AccessOtherUserFolder
+# Use alice's token but try to get bob's folder
+# Replace BOBS_FOLDER_ID with an actual folder owned by another user
+# GET {{BASE_URL}}/api/folders/BOBS_FOLDER_ID
+# Authorization: Bearer {{TOKEN}}  (alice's token)
+# Expected: 403 Forbidden
+
+###
+# @name DeleteOtherUserFile
+# DELETE {{BASE_URL}}/api/files/BOBS_FILE_ID
+# Authorization: Bearer {{TOKEN}}  (alice's token)
+# Expected: 403 Forbidden

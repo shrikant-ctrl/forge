@@ -1,0 +1,152 @@
+### ─── Folders Module ─────────────────────────────────────────
+# Full folder CRUD with automatic token + ID chaining.
+#
+# WORKFLOW: Run requests top-to-bottom.
+#   1. Login     → token auto-captured
+#   2. Create    → folder IDs auto-captured
+#   3. List, Get, Update, Delete — all use captured values
+
+@BASE_URL = http://localhost:8000
+
+###
+# @name Login
+# Logs in and captures the token — runs once, used by everything below.
+POST {{BASE_URL}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "alice@company.com",
+  "password": "supersecret123"
+}
+
+###
+@TOKEN = {{Login.response.body.$.accessToken}}
+
+
+### ─── Create ─────────────────────────────────────────────────
+
+###
+# @name CreateRootFolder
+# POST /api/folders
+# Creates a top-level folder (no parent).
+#
+# 201 → { id, name, parentId, ownerId, createdAt, updatedAt }
+POST {{BASE_URL}}/api/folders
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": "Engineering Docs"
+}
+
+###
+@FOLDER_ID = {{CreateRootFolder.response.body.$.id}}
+
+###
+# @name CreateNestedFolder
+# POST /api/folders
+# Creates a folder inside the root folder created above.
+#
+# 201 → { id, name, parentId, ownerId, createdAt, updatedAt }
+# 404 → Parent folder not found
+POST {{BASE_URL}}/api/folders
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": "Q4 Reports",
+  "parentId": "{{FOLDER_ID}}"
+}
+
+###
+@NESTED_FOLDER_ID = {{CreateNestedFolder.response.body.$.id}}
+
+
+### ─── List ───────────────────────────────────────────────────
+
+###
+# @name ListRootFolders
+# GET /api/folders
+# Lists all top-level folders owned by the current user.
+#
+# 200 → FolderResponseDto[]
+GET {{BASE_URL}}/api/folders
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###
+# @name ListFolderChildren
+# GET /api/folders?parentId=<id>
+# Lists folders inside the root folder we created above.
+#
+# 200 → FolderResponseDto[]
+GET {{BASE_URL}}/api/folders?parentId={{FOLDER_ID}}
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+
+### ─── Get ────────────────────────────────────────────────────
+
+###
+# @name GetRootFolder
+# GET /api/folders/{id}
+# Gets folder details. breadcrumbs will be empty for root folders.
+#
+# 200 → { ...FolderResponseDto, breadcrumbs: [{ id, name }] }
+# 403 → Not your folder
+# 404 → Folder not found
+GET {{BASE_URL}}/api/folders/{{FOLDER_ID}}
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+###
+# @name GetNestedFolderWithBreadcrumbs
+# breadcrumbs will include the full path: [ "Engineering Docs" → "Q4 Reports" ]
+GET {{BASE_URL}}/api/folders/{{NESTED_FOLDER_ID}}
+Authorization: Bearer {{TOKEN}}
+Accept: application/json
+
+
+### ─── Update ─────────────────────────────────────────────────
+
+###
+# @name RenameFolder
+# PATCH /api/folders/{id}
+# Renames the root folder.
+#
+# 200 → FolderResponseDto
+# 403 → Not your folder
+# 404 → Folder not found
+PATCH {{BASE_URL}}/api/folders/{{FOLDER_ID}}
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "name": "Engineering Documentation"
+}
+
+###
+# @name MoveFolderToRoot
+# PATCH /api/folders/{id}
+# Moves the nested folder back to the top level (parentId: null).
+PATCH {{BASE_URL}}/api/folders/{{NESTED_FOLDER_ID}}
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "parentId": null
+}
+
+
+### ─── Delete ─────────────────────────────────────────────────
+
+###
+# @name DeleteFolder
+# DELETE /api/folders/{id}
+# Soft-deletes the nested folder. Returns 204 No Content.
+#
+# 204 → Deleted
+# 403 → Not your folder
+# 404 → Folder not found
+DELETE {{BASE_URL}}/api/folders/{{NESTED_FOLDER_ID}}
+Authorization: Bearer {{TOKEN}}
