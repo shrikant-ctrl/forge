@@ -1,101 +1,110 @@
 # Forge — Enterprise Internal File Hub
 
-[![Architecture](https://img.shields.io/badge/Architecture-Monorepo%20(Turborepo%20%2B%20pnpm)-blue.svg)](#architecture)
 [![Backend](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.14-009688.svg)](#backend)
 [![ORM](https://img.shields.io/badge/ORM-Prisma%20for%20Python-2D3748.svg)](#database--schema-management)
 [![Frontend](https://img.shields.io/badge/Frontend-TanStack%20React%20%7C%20Vite-61DAFB.svg)](#frontend)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-336791.svg)](#infrastructure)
-[![Storage](https://img.shields.io/badge/Storage-MinIO%20(S3%20Compatible)-C72C48.svg)](#infrastructure)
+[![Storage](https://img.shields.io/badge/Storage-MinIO%20S3-C72C48.svg)](#infrastructure)
+[![Monorepo](https://img.shields.io/badge/Monorepo-Turborepo%20%2B%20pnpm-EF4444.svg)](#monorepo-overview)
 
-**Forge** is an enterprise-grade, high-performance internal file hub (a "Mini Google Drive") engineered with a modern, scalable monorepo architecture. It delivers secure blob storage, hierarchical folder management, granular role-based access control (RBAC), and zero-hassle schema synchronization powered by **Prisma for Python**.
-
-For comprehensive product specifications and screen workflows, consult:
-- [Software Requirements Specification (SRS)](./docs/SRS_Internal_File_Hub.md)
-- [Frontend Screen Specifications](./docs/FE_screens.md)
+**Forge** is a scalable, enterprise-grade internal file hub — a "Mini Google Drive" for teams. The backend is structured using a **NestJS-style modular architecture** (Controllers, Services, DTOs, Guards, Exception Filters) while powered by Python 3.14 + FastAPI. The frontend is a React 19 SPA built with TanStack Router and TanStack Query.
 
 ---
 
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Tech Stack & Services](#tech-stack--services)
+2. [Tech Stack](#tech-stack)
 3. [Prerequisites](#prerequisites)
-4. [End-to-End Setup & Installation](#end-to-end-setup--installation)
-   - [Step 1: Clone Repository](#step-1-clone-repository)
-   - [Step 2: Core Tooling Setup](#step-2-core-tooling-setup)
-   - [Step 3: Environment Variables](#step-3-environment-variables)
-   - [Step 4: Install Dependencies](#step-4-install-dependencies)
-   - [Step 5: Spin Up Infrastructure (Docker)](#step-5-spin-up-infrastructure-docker)
-   - [Step 6: Database Schema Synchronization (Prisma)](#step-6-database-schema-synchronization-prisma)
-   - [Step 7: Launch Development Servers](#step-7-launch-development-servers)
-5. [Endpoints & Verification](#endpoints--verification)
-6. [Monorepo Scripts & Cheatsheet](#monorepo-scripts--cheatsheet)
-7. [Database & Schema Management (Prisma)](#database--schema-management)
-8. [Repository Structure](#repository-structure)
-9. [Troubleshooting & FAQ](#troubleshooting--faq)
-10. [Engineering Guidelines](#engineering-guidelines)
+4. [First-Time Setup (New Developer)](#first-time-setup-new-developer)
+   - [1. Clone & Navigate](#1-clone--navigate)
+   - [2. Install Tooling](#2-install-tooling)
+   - [3. Configure Environment](#3-configure-environment)
+   - [4. Start Infrastructure (Docker)](#4-start-infrastructure-docker)
+   - [5. Install Dependencies](#5-install-dependencies)
+   - [6. Sync Database Schema](#6-sync-database-schema)
+   - [7. Run the Full Stack](#7-run-the-full-stack)
+5. [Working on the Backend (BE)](#working-on-the-backend-be)
+6. [Working on the Frontend (FE)](#working-on-the-frontend-fe)
+7. [API Reference](#api-reference)
+8. [All Commands Cheatsheet](#all-commands-cheatsheet)
+9. [Project Structure](#project-structure)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Architecture Overview
 
 ```
-                        ┌───────────────────────────────┐
-                        │      Client Browser (SPA)     │
-                        │   React 19 + TanStack Router  │
-                        └───────────────┬───────────────┘
-                                        │ HTTP / JSON
-                                        ▼
-                        ┌───────────────────────────────┐
-                        │     FastAPI Gateway (API)     │
-                        │    Python 3.14+ (Async I/O)   │
-                        └───┬───────────┬───────────┬───┘
-                            │           │           │
-           Prisma Client    │           │ Redis     │ Presigned URLs / Boto3
-                            ▼           ▼           ▼
-                   ┌────────────┐ ┌───────────┐ ┌─────────────┐
-                   │ PostgreSQL │ │   Redis   │ │    MinIO    │
-                   │  Metadata  │ │ Cache /   │ │ S3 Storage  │
-                   │   & RBAC   │ │  Queues   │ │    Blobs    │
-                   └────────────┘ └───────────┘ └─────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  React 19 SPA (apps/web)  :3000                          │
+│  TanStack Router • TanStack Query • TailwindCSS v4       │
+└─────────────────────────┬────────────────────────────────┘
+                          │ REST / JSON
+                          ▼
+┌──────────────────────────────────────────────────────────┐
+│  FastAPI (apps/api)  :8000                               │
+│  NestJS-Style: Controllers → Services → DTOs             │
+│  Guards (AuthGuard, RolesGuard) • Exception Filters      │
+│  JWT Auth (PyJWT + bcrypt) • Prisma Client               │
+└──────┬────────────────────────┬──────────────────────────┘
+       │                        │                        │
+       ▼                        ▼                        ▼
+┌────────────┐          ┌───────────┐          ┌─────────────┐
+│ PostgreSQL  │          │   Redis   │          │    MinIO    │
+│  :5432      │          │   :6379   │          │ :9000/:9001 │
+│  Users      │          │  Cache /  │          │ S3 Storage  │
+│  Files      │          │  Queues   │          │   Blobs     │
+│  Folders    │          └───────────┘          └─────────────┘
+│  Versions   │
+│  ShareLinks │
+└────────────┘
 ```
-
-The system separates metadata concerns from binary storage:
-- **Relational Integrity via Prisma**: Schema models, folder hierarchies, permissions, audit logs, and user sessions are declared in `apps/api/prisma/schema.prisma` and queried via the auto-generated, type-safe async Prisma Python client.
-- **Direct & Secure Blob Delivery**: Files are stored in S3/MinIO. Downloads and uploads leverage short-lived signed URLs to eliminate API proxy bottlenecking.
-- **Background Tasks & Caching**: Redis coordinates asynchronous operations (thumbnail generation, metadata extraction) and distributed rate limiting.
 
 ---
 
-## Tech Stack & Services
+## Tech Stack
 
-| Layer | Technology | Version / Stack | Port |
-| :--- | :--- | :--- | :--- |
-| **Monorepo Engine** | [Turborepo](https://turbo.build/) + [pnpm](https://pnpm.io/) | Turbo 2.x, pnpm 10.x | N/A |
-| **Frontend** | React 19, [TanStack Router](https://tanstack.com/router), [TanStack Query](https://tanstack.com/query), TailwindCSS v4 | Vite 8, Biome | `3000` |
-| **Backend** | [FastAPI](https://fastapi.tiangolo.com/), Pydantic v2, Uvicorn | Python 3.14+, uv | `8000` |
-| **ORM & Schema** | [Prisma for Python](https://prisma-client-py.readthedocs.io/) (`prisma-client-py`) | 0.15.x | N/A |
-| **Database** | PostgreSQL | 16-alpine | `5432` |
-| **Cache / Queue** | Redis | 7-alpine | `6379` |
-| **Object Storage** | MinIO (S3-compatible) | Latest | `9000` (API), `9001` (Console) |
+| Layer | Technology | Port |
+| :--- | :--- | :--- |
+| **Frontend** | React 19, TanStack Router, TanStack Query, TailwindCSS v4, Vite 8, Biome | `:3000` |
+| **Backend** | FastAPI, Python 3.14+, Pydantic v2, Uvicorn | `:8000` |
+| **ORM & Schema** | Prisma for Python (`prisma-client-py`) — auto schema sync | — |
+| **Database** | PostgreSQL 16 | `:5432` |
+| **Cache** | Redis 7 | `:6379` |
+| **Object Storage** | MinIO (S3-compatible) | `:9000` (API) / `:9001` (Console) |
+| **Monorepo** | Turborepo + pnpm workspaces | — |
+| **Package Manager** | pnpm 10.x (via Corepack) | — |
+| **Python Tooling** | uv (package manager + virtualenv) | — |
 
 ---
 
 ## Prerequisites
 
-Ensure the following tools are installed on your host system:
+Install these tools before starting. **All are required.**
 
-- **Node.js**: `v20.x` or `v22.x` (LTS recommended)
-- **pnpm**: `v10.x` (Recommended via Corepack or standalone install)
-- **Python**: `3.14+`
-- **[uv](https://github.com/astral-sh/uv)**: Astral's high-performance Python package and virtualenv manager
-- **Docker & Docker Compose**: Engine `24.x+` with Compose V2 (or native PostgreSQL/Redis/MinIO services)
+| Tool | Install Command | Verify |
+| :--- | :--- | :--- |
+| **Node.js** v22 | [nodejs.org](https://nodejs.org/) | `node -v` |
+| **pnpm** v10 | `corepack enable && corepack prepare pnpm@10.32.1 --activate` | `pnpm -v` |
+| **Python** 3.14+ | [python.org](https://www.python.org/) or `uv python install 3.14` | `python --version` |
+| **uv** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `uv --version` |
+| **Docker** + Compose | [docker.com](https://www.docker.com/) | `docker compose version` |
+| **Git** | [git-scm.com](https://git-scm.com/) | `git --version` |
+
+> **Note on pnpm**: If `pnpm` isn't available after `corepack enable`, run:
+> ```bash
+> corepack enable --install-directory ~/.local/bin
+> echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+> ```
 
 ---
 
-## End-to-End Setup & Installation
+## First-Time Setup (New Developer)
 
-### Step 1: Clone Repository
+Run these steps **once** when you first clone the project. After that, just use `pnpm run dev` to start working.
+
+### 1. Clone & Navigate
 
 ```bash
 git clone https://github.com/your-org/forge.git
@@ -104,50 +113,49 @@ cd forge
 
 ---
 
-### Step 2: Core Tooling Setup
+### 2. Install Tooling
 
-1. **Enable pnpm via Corepack** (Node.js bundled):
-   ```bash
-   corepack enable
-   corepack prepare pnpm@10.32.1 --activate
-   ```
-   *If using a local path or non-root environment:*
-   ```bash
-   corepack enable --install-directory ~/.local/bin
-   export PATH="$HOME/.local/bin:$PATH"
-   ```
+Make sure `pnpm` is available:
 
-2. **Verify `uv` installation**:
-   ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-   *Optional:* Ensure Python 3.14 is available:
-   ```bash
-   uv python install 3.14
-   ```
+```bash
+corepack enable
+corepack prepare pnpm@10.32.1 --activate
+pnpm -v  # should print 10.32.1
+```
+
+Make sure `uv` is available:
+
+```bash
+uv --version  # should print 0.x.x
+# If not installed:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source ~/.bashrc  # or restart your terminal
+```
 
 ---
 
-### Step 3: Environment Variables
+### 3. Configure Environment
 
-Forge includes a pre-configured `.env.example`. Create your local environment file:
+Copy the environment template and **fill in your values** (defaults work for local dev out of the box):
 
 ```bash
 cp .env.example .env
 ```
 
-Review values in `.env`:
+The `.env` file lives at the **monorepo root** and is shared by all services:
 
 ```ini
-# Backend Database & Cache (Standard PostgreSQL URL for Prisma)
+# PostgreSQL connection (standard URL — no +asyncpg prefix)
 DATABASE_URL=postgresql://admin:password@localhost:5432/file_hub
+
+# Redis
 REDIS_URL=redis://localhost:6379/0
 
-# JWT & Authentication Security
+# JWT — CHANGE THIS in any real environment
 SECRET_KEY=supersecretkey_change_in_production
 ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# S3 / MinIO Object Storage
+# MinIO / S3 Object Storage
 AWS_ACCESS_KEY_ID=admin
 AWS_SECRET_ACCESS_KEY=password123
 AWS_REGION=us-east-1
@@ -155,17 +163,53 @@ S3_ENDPOINT_URL=http://localhost:9000
 S3_BUCKET_NAME=filehub-bucket
 ```
 
+Symlink the root `.env` so Prisma CLI can find it when run from `apps/api/`:
+
+```bash
+ln -sf ../../.env apps/api/.env
+```
+
 ---
 
-### Step 4: Install Dependencies
+### 4. Start Infrastructure (Docker)
 
-Install all root, web, and workspace JavaScript/TypeScript dependencies:
+Start PostgreSQL, Redis, and MinIO:
+
+```bash
+docker compose up -d
+```
+
+Verify all 3 containers are running:
+
+```bash
+docker compose ps
+```
+
+```
+NAME              STATUS    PORTS
+file_hub_db       running   0.0.0.0:5432->5432/tcp
+file_hub_redis    running   0.0.0.0:6379->6379/tcp
+file_hub_minio    running   0.0.0.0:9000->9000/tcp, 0.0.0.0:9001->9001/tcp
+```
+
+**Create the MinIO bucket** (one-time):
+1. Open [http://localhost:9001](http://localhost:9001) — MinIO console
+2. Login: `admin` / `password123`
+3. Go to **Buckets → Create Bucket** → name it `filehub-bucket`
+
+> **If you already run PostgreSQL, Redis, or MinIO natively** (not Docker), you can skip `docker compose up`. The app reads from `DATABASE_URL` in `.env` regardless.
+
+---
+
+### 5. Install Dependencies
+
+Install all Node.js dependencies (frontend, root tooling, Turborepo):
 
 ```bash
 pnpm install
 ```
 
-Initialize the Python backend virtual environment and install all packages:
+Install all Python dependencies and create the virtualenv in `apps/api/.venv/`:
 
 ```bash
 cd apps/api
@@ -175,302 +219,553 @@ cd ../..
 
 ---
 
-### Step 5: Spin Up Infrastructure (Docker)
+### 6. Sync Database Schema
 
-Start the backing PostgreSQL database, Redis instance, and MinIO storage engine in detached mode:
-
-```bash
-docker compose up -d
-```
-
-Verify that containers are running:
-
-```bash
-docker compose ps
-```
-
-> **Note**: If your machine already runs PostgreSQL, Redis, or MinIO natively on standard ports (`5432`, `6379`, `9000`, `9001`), Docker is not required; the app will connect directly to the active host services.
-
-#### MinIO Bucket Setup
-1. Open the MinIO Web Console at [http://localhost:9001](http://localhost:9001).
-2. Log in with:
-   - **Username**: `admin`
-   - **Password**: `password123`
-3. Under **Administrator** > **Buckets**, click **Create Bucket** and name it: `filehub-bucket`.
-
----
-
-### Step 6: Database Schema Synchronization (Prisma)
-
-Forge uses **Prisma for Python** for zero-hassle database synchronization. You do **not** need to manually generate or run migration scripts.
-
-From the repository root, run:
+Push the Prisma schema to PostgreSQL and generate the typed Python client:
 
 ```bash
 pnpm db:push
 ```
 
-This command:
-1. Compares `apps/api/prisma/schema.prisma` with your PostgreSQL database.
-2. **Automatically creates new tables, alters existing columns, and drops removed fields**.
-3. Generates the strictly typed async Python client into `apps/api/.venv`.
+You should see:
+```
+🚀  Your database is now in sync with your Prisma schema.
+✔  Generated Prisma Client Python (v0.15.0)
+```
+
+> This creates all tables (`users`, `files`, `folders`, `file_versions`, `share_links`) automatically. **No SQL or migration files needed.**
 
 ---
 
-### Step 7: Launch Development Servers
+### 7. Run the Full Stack
 
-#### Option A: Run Full Stack Concurrently (Recommended)
-From the root directory, launch Turborepo to run the FastAPI backend and TanStack frontend simultaneously:
+Start both the backend (`:8000`) and frontend (`:3000`) simultaneously from the root:
 
 ```bash
 pnpm run dev
 ```
 
-> **Zero-Touch Schema Sync**: The `pnpm run dev` task automatically runs `prisma db push` on boot. Every time you start the app, your database schema is guaranteed to match your Prisma definitions!
+> **Automatic schema sync**: Every time you run `pnpm run dev`, the backend automatically runs `prisma db push` before booting. Your database is always in sync with the schema.
 
-#### Option B: Run Services Individually
+**Verify everything is running:**
 
-- **FastAPI Backend only**:
-  ```bash
-  pnpm --filter api dev
-  # or directly:
-  cd apps/api && uv run prisma db push && uv run fastapi dev app/main.py
-  ```
-
-- **React Web Frontend only**:
-  ```bash
-  pnpm --filter web dev
-  # or directly:
-  cd apps/web && pnpm dev
-  ```
+| URL | What to expect |
+| :--- | :--- |
+| [http://localhost:3000](http://localhost:3000) | React frontend |
+| [http://localhost:8000/health](http://localhost:8000/health) | `{"status":"ok","database":"connected"}` |
+| [http://localhost:8000/docs](http://localhost:8000/docs) | Swagger UI — all API endpoints |
+| [http://localhost:9001](http://localhost:9001) | MinIO console |
 
 ---
 
-## Endpoints & Verification
+## Working on the Backend (BE)
 
-Once the stack is running, verify each endpoint:
-
-| Service | URL | Notes / Credentials |
-| :--- | :--- | :--- |
-| **Web Application** | [http://localhost:3000](http://localhost:3000) | Main React SPA Dashboard & Explorer |
-| **FastAPI Backend** | [http://localhost:8000](http://localhost:8000) | Root API endpoint |
-| **API Health Check** | [http://localhost:8000/health](http://localhost:8000/health) | Verifies API & DB connection (`{"status":"ok","database":"connected"}`) |
-| **Interactive API Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Swagger UI for interactive testing |
-| **Alternative API Docs** | [http://localhost:8000/redoc](http://localhost:8000/redoc) | ReDoc schema documentation |
-| **Prisma Studio (GUI)** | [http://localhost:5555](http://localhost:5555) | Visual database browser (`pnpm db:studio`) |
-| **MinIO Console** | [http://localhost:9001](http://localhost:9001) | User: `admin` \| Pass: `password123` |
-| **MinIO S3 API** | [http://localhost:9000](http://localhost:9000) | Direct S3 endpoint |
-| **PostgreSQL Database** | `localhost:5432` | DB: `file_hub` \| User: `admin` \| Pass: `password` |
-| **Redis Cache** | `localhost:6379` | Default DB `0` |
-
-### Quick Smoke Test
+### Running the Backend Alone
 
 ```bash
-curl http://localhost:8000/health
-# Response: {"status":"ok","database":"connected"}
+# From repo root
+pnpm --filter api dev
+
+# Or directly from apps/api/
+cd apps/api
+uv run prisma db push && uv run fastapi dev app/main.py
 ```
 
----
+The server runs at **`http://localhost:8000`** with hot reload enabled.
 
-## Monorepo Scripts & Cheatsheet
+### Adding a New Module (NestJS-Style Pattern)
 
-### Root Monorepo Commands
+Every feature lives in `apps/api/app/modules/<feature>/`. Follow this structure:
 
-| Command | Action |
-| :--- | :--- |
-| `pnpm run dev` | Runs `prisma db push` and starts backend and frontend development servers concurrently |
-| `pnpm run build` | Builds production artifacts for all packages |
-| `pnpm run lint` | Runs linters across packages (`ruff check .` on backend, `biome lint` on frontend) |
-| `pnpm run format` | Auto-formats code across packages (`ruff format .` on backend, `biome format` on frontend) |
-| `pnpm run typecheck` | Validates TypeScript types in the frontend (`tsc --noEmit`) |
-| `pnpm run test` | Executes unit and integration test suites |
-| `pnpm run clean` | Cleans build outputs, temporary directories, and Turbo caches |
+```
+apps/api/app/modules/
+└── my_feature/
+    ├── __init__.py
+    ├── my_feature_controller.py   # APIRouter — maps HTTP routes to service methods
+    ├── my_feature_service.py      # Business logic + Prisma queries
+    └── dto/
+        ├── __init__.py
+        └── my_feature_dto.py      # Pydantic request/response models
+```
 
-### Database Commands (Prisma)
+**Step 1 — Add a Prisma model** in `apps/api/prisma/schema.prisma`:
 
-| Command | Action |
-| :--- | :--- |
-| `pnpm db:push` | Syncs `schema.prisma` directly with PostgreSQL and regenerates the Python client |
-| `pnpm db:studio` | Launches Prisma Studio GUI on `http://localhost:5555` to browse and edit records |
-| `pnpm db:generate` | Manually regenerates the Python client types from `schema.prisma` |
+```prisma
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  fileId    String   @map("file_id")
+  file      File     @relation(fields: [fileId], references: [id])
+  authorId  String   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
 
----
+  @@map("comments")
+}
+```
 
-## Database & Schema Management (Prisma)
+**Step 2 — Push the schema** (no migration files needed):
 
-### Modifying Schema (TypeORM-Style Workflow)
-All database models live in **`apps/api/prisma/schema.prisma`**.
+```bash
+pnpm db:push
+# PostgreSQL now has a `comments` table + typed Python client is regenerated
+```
 
-When you need to add, alter, or remove fields:
-1. Edit `apps/api/prisma/schema.prisma`:
-   ```prisma
-   model File {
-     id          String   @id @default(uuid())
-     name        String
-     sizeBytes   BigInt   @map("size_bytes")
-     mimeType    String   @map("mime_type")
-     storageKey  String   @unique @map("storage_key")
-     // Add new fields directly here:
-     isFavorite  Boolean  @default(false) @map("is_favorite")
-     ...
-   }
-   ```
-2. Run `pnpm db:push` (or simply run `pnpm dev`).
-3. PostgreSQL is updated immediately and Python client types are re-generated. **No migration files, no Alembic hassle.**
-
-### Using the Prisma Client in FastAPI
-Use the `db` client singleton in `app/core/db.py`:
+**Step 3 — Create DTOs** (`dto/comment_dto.py`):
 
 ```python
-from fastapi import APIRouter, Depends
+from pydantic import BaseModel, Field
+
+class CreateCommentDto(BaseModel):
+    content: str = Field(..., min_length=1, max_length=2000)
+    fileId: str
+
+class CommentResponseDto(BaseModel):
+    id: str
+    content: str
+    fileId: str
+    authorId: str
+```
+
+**Step 4 — Create the Service** (`comments_service.py`):
+
+```python
+from typing import Annotated
+from fastapi import Depends
 from prisma import Prisma
 from app.core.db import get_db
+from app.modules.comments.dto.comment_dto import CreateCommentDto, CommentResponseDto
 
-router = APIRouter()
+class CommentsService:
+    def __init__(self, db: Prisma):
+        self.db = db
 
-@router.get("/files")
-async def list_files(db: Prisma = Depends(get_db)):
-    files = await db.file.find_many(
-        where={"isDeleted": False},
-        include={"owner": True, "versions": True}
-    )
-    return files
+    async def create(self, dto: CreateCommentDto, user_id: str) -> CommentResponseDto:
+        comment = await self.db.comment.create(data={
+            "content": dto.content,
+            "fileId": dto.fileId,
+            "authorId": user_id,
+        })
+        return CommentResponseDto(id=comment.id, content=comment.content,
+                                  fileId=comment.fileId, authorId=comment.authorId)
+
+def get_comments_service(db: Annotated[Prisma, Depends(get_db)]) -> CommentsService:
+    return CommentsService(db)
+```
+
+**Step 5 — Create the Controller** (`comments_controller.py`):
+
+```python
+from fastapi import APIRouter, Depends, status
+from typing import Annotated
+from app.common.guards.auth_guard import AuthGuard
+from app.modules.comments.comments_service import CommentsService, get_comments_service
+from app.modules.comments.dto.comment_dto import CreateCommentDto, CommentResponseDto
+
+router = APIRouter(prefix="/comments", tags=["Comments"])
+
+@router.post("", response_model=CommentResponseDto, status_code=status.HTTP_201_CREATED)
+async def create_comment(
+    dto: CreateCommentDto,
+    current_user: AuthGuard,
+    service: Annotated[CommentsService, Depends(get_comments_service)],
+):
+    return await service.create(dto, user_id=current_user.id)
+```
+
+**Step 6 — Register the router** in `app/main.py`:
+
+```python
+from app.modules.comments.comments_controller import router as comments_router
+app.include_router(comments_router, prefix="/api")
+```
+
+Done. Your new `POST /api/comments` endpoint is live.
+
+### Using Guards
+
+```python
+from app.common.guards.auth_guard import AuthGuard          # JWT required
+from app.common.guards.roles_guard import Roles
+from prisma.enums import Role
+
+# Require login
+@router.get("/me")
+async def get_me(current_user: AuthGuard): ...
+
+# Require ADMIN role
+@router.delete("/users/{id}")
+async def delete_user(user: Annotated[User, Depends(Roles(Role.ADMIN))]): ...
+```
+
+### Writing Tests
+
+Tests live in `apps/api/tests/`. The test client runs the full FastAPI app in-process.
+
+```bash
+# Run tests
+pnpm --filter api test
+
+# Or directly
+cd apps/api && uv run pytest -v
+```
+
+### Code Quality
+
+```bash
+pnpm --filter api lint      # ruff check
+pnpm --filter api format    # ruff format
 ```
 
 ---
 
+## Working on the Frontend (FE)
+
+### Running the Frontend Alone
+
+```bash
+# From repo root
+pnpm --filter web dev
+
+# Or directly
+cd apps/web && pnpm dev
+```
+
+The app runs at **`http://localhost:3000`** with hot module replacement (HMR).
+
+### Adding a New Page / Route
+
+Routes are **file-based** using TanStack Router. Every file in `apps/web/src/routes/` becomes a route.
+
+**Step 1 — Create the route file**:
+
+```bash
+# Example: creates /dashboard route
+touch apps/web/src/routes/dashboard.tsx
+```
+
+```tsx
+// apps/web/src/routes/dashboard.tsx
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/dashboard')({
+  component: DashboardPage,
+})
+
+function DashboardPage() {
+  return <div>Dashboard</div>
+}
+```
+
+**Step 2 — Regenerate the route tree** (run once after adding files):
+
+```bash
+pnpm --filter web generate-routes
+# Or from root:
+cd apps/web && pnpm generate-routes
+```
+
+> During `pnpm dev`, the route tree regenerates automatically on file save.
+
+### Fetching Data from the Backend
+
+Use TanStack Query. The API base URL is `http://localhost:8000`.
+
+```tsx
+// Example: fetching files list
+import { useQuery } from '@tanstack/react-query'
+
+function useFiles(folderId?: string) {
+  return useQuery({
+    queryKey: ['files', folderId],
+    queryFn: async () => {
+      const token = localStorage.getItem('accessToken')
+      const url = folderId
+        ? `/api/files?folderId=${folderId}`
+        : '/api/files'
+      const res = await fetch(`http://localhost:8000${url}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Failed to fetch files')
+      return res.json()
+    },
+  })
+}
+```
+
+### Code Quality
+
+```bash
+pnpm --filter web lint       # biome lint
+pnpm --filter web format     # biome format
+pnpm --filter web typecheck  # tsc --noEmit
+pnpm --filter web check      # biome check (lint + format combined)
+```
+
 ---
 
-## Repository Structure
+## API Reference
 
-```text
+Interactive docs (Swagger UI): **[http://localhost:8000/docs](http://localhost:8000/docs)**
+
+All endpoints are prefixed with `/api`. Authentication uses `Authorization: Bearer <token>`.
+
+### Auth — `/api/auth`
+
+| Method | Path | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | ❌ | Register a new user |
+| `POST` | `/api/auth/login` | ❌ | Login, returns JWT access token |
+| `GET` | `/api/auth/me` | ✅ | Get authenticated user profile |
+
+**Register:**
+```bash
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@company.com","password":"securepass123","name":"Your Name"}'
+```
+
+**Login:**
+```bash
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@company.com","password":"securepass123"}'
+# Returns: {"accessToken":"eyJ...","tokenType":"Bearer","expiresIn":1800}
+```
+
+### Folders — `/api/folders`
+
+| Method | Path | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/folders` | ✅ | Create folder (optionally nested under `parentId`) |
+| `GET` | `/api/folders?parentId=<id>` | ✅ | List folders at root or inside a parent |
+| `GET` | `/api/folders/{id}` | ✅ | Get folder details + breadcrumb path |
+| `PATCH` | `/api/folders/{id}` | ✅ | Rename or move folder |
+| `DELETE` | `/api/folders/{id}` | ✅ | Soft-delete folder |
+
+### Files — `/api/files`
+
+| Method | Path | Auth | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/files/init-upload` | ✅ | Get a presigned S3 PUT URL to upload directly |
+| `POST` | `/api/files/complete-upload` | ✅ | Confirm upload completion, creates Version 1 |
+| `GET` | `/api/files?folderId=<id>&search=<q>` | ✅ | List files with optional folder filter / search |
+| `GET` | `/api/files/{id}` | ✅ | Get file metadata |
+| `GET` | `/api/files/{id}/download-url` | ✅ | Get presigned S3 download URL |
+| `PATCH` | `/api/files/{id}` | ✅ | Rename or move file |
+| `DELETE` | `/api/files/{id}` | ✅ | Soft-delete file |
+
+### Error Response Format (NestJS-style)
+
+All errors return a consistent JSON envelope:
+
+```json
+{
+  "statusCode": 404,
+  "message": "Folder with ID 'abc' not found",
+  "error": "Not Found",
+  "details": null,
+  "timestamp": "2026-09-09T11:22:58.330835+00:00",
+  "path": "/api/folders/abc"
+}
+```
+
+---
+
+## All Commands Cheatsheet
+
+### From the Repo Root (Recommended)
+
+| Command | What it does |
+| :--- | :--- |
+| `pnpm run dev` | ✅ Start everything: schema sync + backend + frontend |
+| `pnpm run build` | Build all packages for production |
+| `pnpm run lint` | Lint all packages |
+| `pnpm run format` | Format all packages |
+| `pnpm run typecheck` | TypeScript check (frontend) |
+| `pnpm run test` | Run all test suites |
+| `pnpm run clean` | Clean build artifacts and caches |
+| `pnpm db:push` | Sync `schema.prisma` → PostgreSQL, regenerate Python client |
+| `pnpm db:studio` | Open Prisma Studio GUI at `http://localhost:5555` |
+| `pnpm db:generate` | Regenerate Python client types only (no DB changes) |
+
+### Backend Only
+
+| Command | What it does |
+| :--- | :--- |
+| `pnpm --filter api dev` | Start FastAPI dev server (auto schema sync first) |
+| `pnpm --filter api test` | Run pytest test suite |
+| `pnpm --filter api lint` | `ruff check .` |
+| `pnpm --filter api format` | `ruff format .` |
+| `pnpm --filter api db:push` | Same as `pnpm db:push` |
+| `pnpm --filter api db:studio` | Open Prisma Studio |
+
+### Frontend Only
+
+| Command | What it does |
+| :--- | :--- |
+| `pnpm --filter web dev` | Start Vite dev server on `:3000` |
+| `pnpm --filter web build` | Production bundle |
+| `pnpm --filter web lint` | `biome lint` |
+| `pnpm --filter web format` | `biome format` |
+| `pnpm --filter web check` | `biome check` (lint + format) |
+| `pnpm --filter web typecheck` | `tsc --noEmit` |
+| `pnpm --filter web generate-routes` | Regenerate TanStack route tree |
+
+### Docker
+
+| Command | What it does |
+| :--- | :--- |
+| `docker compose up -d` | Start PostgreSQL, Redis, MinIO in background |
+| `docker compose ps` | Check container status |
+| `docker compose stop` | Stop containers (preserve data) |
+| `docker compose down` | Stop and remove containers (preserve volumes) |
+| `docker compose down -v` | ⚠️ Stop, remove containers AND volumes (wipes data) |
+| `docker compose logs -f db` | Tail PostgreSQL logs |
+
+---
+
+## Project Structure
+
+```
 forge/
-├── .agents/                    # Architecture rules & agent customizations
-│   └── rules/
-│       └── architecture.md     # Engineering standards & constraints
+├── .env.example                    # Copy to .env — fill in your values
+├── .gitignore
+├── docker-compose.yml              # PostgreSQL :5432, Redis :6379, MinIO :9000/:9001
+├── package.json                    # Root scripts (dev, build, lint, test, db:*)
+├── pnpm-workspace.yaml             # pnpm workspace config
+├── turbo.json                      # Turborepo pipeline
+│
 ├── apps/
-│   ├── api/                    # FastAPI Backend (NestJS Modular Architecture)
-│   │   ├── app/
-│   │   │   ├── core/           # Core singletons & configurations
-│   │   │   │   ├── config.py   # Pydantic Settings & environment validation
-│   │   │   │   ├── db.py       # Prisma client singleton & get_db dependency
-│   │   │   │   ├── security.py # bcrypt password hashing & JWT token management
-│   │   │   │   └── exceptions.py # NestJS-style HttpException hierarchy
-│   │   │   │
-│   │   │   ├── common/         # Cross-cutting concerns
-│   │   │   │   ├── guards/     # NestJS Guards
-│   │   │   │   │   ├── auth_guard.py   # JWT Bearer token authentication guard
-│   │   │   │   │   └── roles_guard.py  # RBAC role authorization guard
-│   │   │   │   └── filters/    # Exception Filters
-│   │   │   │       └── http_exception_filter.py # Standardized NestJS JSON error payloads
-│   │   │   │
-│   │   │   ├── modules/        # Domain Feature Modules
-│   │   │   │   ├── auth/       # Authentication Module
-│   │   │   │   │   ├── auth_controller.py # /api/auth endpoints (register, login, me)
-│   │   │   │   │   ├── auth_service.py    # Injectable AuthService business logic
-│   │   │   │   │   └── dto/
-│   │   │   │   │       └── auth_dto.py    # RegisterDto, LoginDto, TokenResponseDto, UserDto
-│   │   │   │   │
-│   │   │   │   ├── folders/    # Folders Module
-│   │   │   │   │   ├── folders_controller.py # /api/folders endpoints (CRUD, tree, move)
-│   │   │   │   │   ├── folders_service.py    # Injectable FoldersService provider
-│   │   │   │   │   └── dto/
-│   │   │   │   │       └── folders_dto.py    # CreateFolderDto, UpdateFolderDto, FolderResponseDto
-│   │   │   │   │
-│   │   │   │   ├── files/      # Files Module
-│   │   │   │   │   ├── files_controller.py   # /api/files endpoints (upload, download, CRUD)
-│   │   │   │   │   ├── files_service.py      # Injectable FilesService provider & quota tracking
-│   │   │   │   │   └── dto/
-│   │   │   │   │       └── files_dto.py      # InitUploadDto, CompleteUploadDto, FileResponseDto
-│   │   │   │   │
-│   │   │   │   └── storage/    # Storage Module
-│   │   │   │       └── storage_service.py    # S3 / MinIO presigned URL generator & blob manager
-│   │   │   │
-│   │   │   └── main.py         # Application root mounting module routers & exception filters
+│   ├── api/                        # ─── BACKEND ───────────────────────────
+│   │   ├── .env -> ../../.env      # Symlink to root .env (Prisma CLI needs it)
+│   │   ├── package.json            # BE scripts: dev, test, lint, db:push, db:studio
+│   │   ├── pyproject.toml          # Python deps: fastapi, prisma, pyjwt, bcrypt, boto3
+│   │   ├── uv.lock                 # Locked Python deps
 │   │   │
 │   │   ├── prisma/
-│   │   │   └── schema.prisma   # Declarative database models (User, Folder, File, etc.)
-│   │   ├── tests/              # Integration and end-to-end test suite
-│   │   │   └── test_api_flow.py # Full flow tests: Auth, Folders, File uploads, Error filters
-│   │   ├── package.json        # Workspace scripts (dev, test, lint, db:push, db:studio)
-│   │   ├── pyproject.toml      # Python dependencies (FastAPI, Prisma, bcrypt, boto3, pyjwt)
-│   │   └── uv.lock             # Deterministic Python dependency lock
+│   │   │   └── schema.prisma       # ← SINGLE SOURCE OF TRUTH for all DB models
+│   │   │
+│   │   ├── app/
+│   │   │   ├── main.py             # FastAPI bootstrap: mounts routers, CORS, exception filter
+│   │   │   │
+│   │   │   ├── core/               # Framework-level infrastructure
+│   │   │   │   ├── config.py       # Env vars via Pydantic Settings
+│   │   │   │   ├── db.py           # Prisma client singleton + get_db dependency
+│   │   │   │   ├── security.py     # bcrypt hashing + JWT sign/verify
+│   │   │   │   └── exceptions.py   # HttpException hierarchy (NestJS-style)
+│   │   │   │
+│   │   │   ├── common/             # Cross-cutting concerns
+│   │   │   │   ├── guards/
+│   │   │   │   │   ├── auth_guard.py     # Validates JWT → injects current User
+│   │   │   │   │   └── roles_guard.py    # Roles(Role.ADMIN) RBAC guard
+│   │   │   │   └── filters/
+│   │   │   │       └── http_exception_filter.py  # Formats errors to NestJS envelope
+│   │   │   │
+│   │   │   └── modules/            # Feature modules (add yours here)
+│   │   │       ├── auth/           # Register, Login, /me
+│   │   │       │   ├── auth_controller.py
+│   │   │       │   ├── auth_service.py
+│   │   │       │   └── dto/auth_dto.py
+│   │   │       ├── folders/        # Folder CRUD, tree, breadcrumbs
+│   │   │       │   ├── folders_controller.py
+│   │   │       │   ├── folders_service.py
+│   │   │       │   └── dto/folders_dto.py
+│   │   │       ├── files/          # Upload (presigned), download, CRUD, quota
+│   │   │       │   ├── files_controller.py
+│   │   │       │   ├── files_service.py
+│   │   │       │   └── dto/files_dto.py
+│   │   │       └── storage/        # S3/MinIO presigned URL generator
+│   │   │           └── storage_service.py
+│   │   │
+│   │   └── tests/
+│   │       └── test_api_flow.py    # Integration tests: auth → folders → files → errors
 │   │
-│   └── web/                    # TanStack React Frontend Application
-│       ├── src/
-│       │   ├── components/     # UI design system & shared components
-│       │   ├── hooks/          # Custom React & data fetching hooks
-│       │   ├── routes/         # File-based TanStack routes
-│       │   │   ├── __root.tsx  # Root layout & providers
-│       │   │   └── index.tsx   # File Hub Explorer & Dashboard
-│       │   ├── router.tsx      # TanStack Router instance
-│       │   └── styles.css      # Design tokens & Tailwind styles
-│       ├── biome.json          # Biome linting and formatting configuration
-│       ├── package.json        # Web workspace scripts & dependencies
-│       ├── tsconfig.json       # Strict TypeScript configuration
-│       └── vite.config.ts      # Vite configuration
+│   └── web/                        # ─── FRONTEND ──────────────────────────
+│       ├── package.json            # FE scripts: dev, build, lint, typecheck
+│       ├── vite.config.ts          # Vite + TanStack Start + TailwindCSS v4
+│       ├── tsconfig.json           # Strict TS config
+│       ├── biome.json              # Biome lint/format config
+│       │
+│       └── src/
+│           ├── router.tsx          # TanStack Router instance
+│           ├── styles.css          # Global styles + Tailwind tokens
+│           ├── routes/             # File-based routes (add files here for new pages)
+│           │   ├── __root.tsx      # Root layout: Header, Footer, QueryClientProvider
+│           │   ├── index.tsx       # Home page
+│           │   └── about.tsx
+│           ├── components/         # Shared UI components
+│           │   ├── Header.tsx
+│           │   ├── Footer.tsx
+│           │   └── ThemeToggle.tsx
+│           └── hooks/              # Custom React hooks
 │
-├── docs/                       # Project Documentation & Specifications
-│   ├── FE_screens.md           # UI Screen workflows & interaction states
-│   └── SRS_Internal_File_Hub.md# Software Requirements Specification
-│
-├── docker-compose.yml          # PostgreSQL, Redis, and MinIO definitions
-├── package.json                # Monorepo root configuration & db:* scripts
-├── pnpm-lock.yaml              # Root dependency lockfile
-├── pnpm-workspace.yaml         # pnpm workspace configuration
-├── turbo.json                  # Turborepo task pipeline configuration
-├── .env.example                # Example environment variables
-└── README.md                   # This file
+└── docs/
+    ├── SRS_Internal_File_Hub.md    # Full software requirements spec
+    └── FE_screens.md               # UI screen specs & flows
 ```
 
 ---
 
-## Troubleshooting & FAQ
+## Troubleshooting
 
-### 1. `DATABASE_URL` Format
-Prisma expects standard PostgreSQL connection URIs:
-```text
-postgresql://admin:password@localhost:5432/file_hub
-```
-Do **not** include Python driver prefixes like `postgresql+asyncpg://` or `postgresql+psycopg2://`.
-
-### 2. `Environment variable not found: DATABASE_URL`
-Ensure `.env` exists in the root directory. `apps/api/.env` is symlinked to the root `.env` to ensure both Prisma CLI and Python scripts read identical configurations.
-```bash
-cp .env.example .env
-ln -sf ../../.env apps/api/.env
-```
-
-### 3. `pnpm: command not found`
-Ensure Corepack has linked `pnpm` to your system `PATH`:
+### `pnpm: command not found`
 ```bash
 corepack enable --install-directory ~/.local/bin
 export PATH="$HOME/.local/bin:$PATH"
+# Add to ~/.bashrc or ~/.zshrc to persist
 ```
 
-### 4. Port Collisions
-Ensure ports `3000`, `8000`, `5432`, `6379`, `9000`, and `9001` are available. If PostgreSQL, Redis, or MinIO are already running natively on your machine, Docker Compose is not required.
-
-### 5. Inspecting Database Records Visually
-Run Prisma Studio from the root of the repository:
+### `DATABASE_URL` environment variable not found (Prisma)
+Ensure the symlink exists:
 ```bash
-pnpm db:studio
+ls -la apps/api/.env      # should show -> ../../.env
+# If missing:
+ln -sf ../../.env apps/api/.env
 ```
-Open [http://localhost:5555](http://localhost:5555) in your browser to view, search, and edit records visually.
 
----
+### Port already in use (9001, 5432, etc.)
+Check what's using the port and stop it, or edit `docker-compose.yml` to use a different host port:
+```bash
+# Check who's using port 9001
+ss -tulpn | grep 9001
 
-## Engineering Guidelines
+# Stop any previously running docker stack cleanly
+docker compose down
+```
 
-Adhere to the standards codified in [architecture.md](.agents/rules/architecture.md):
+### Database connection refused
+PostgreSQL takes ~5 seconds to be ready after `docker compose up -d`. Wait a moment then retry:
+```bash
+docker compose logs db     # Check if PostgreSQL finished initializing
+docker compose ps          # Confirm STATUS is "running" not "starting"
+```
 
-1. **Strict Type Safety**:
-   - Backend: All queries leverage auto-generated, type-safe Prisma client types. Validate request and response payloads with Pydantic.
-   - Frontend: Strict TypeScript (`tsc --noEmit`, Zod runtime validation).
-2. **Security & Data Access**:
-   - Never expose raw disk file paths.
-   - File uploads and downloads must utilize secure, short-lived signed S3/MinIO URLs.
-   - API endpoints enforce Role-Based Access Control (RBAC) via the `Role` enum in `schema.prisma`.
-3. **Database Integrity**:
-   - Relational cascading rules (`onDelete: Cascade`) are defined at the database layer in `schema.prisma`.
-   - Soft-deletion (`isDeleted`, `deletedAt`) is supported for trash and recovery features.
+### `ModuleNotFoundError: No module named 'app'` in tests
+The `pythonpath = ["."]` setting in `pyproject.toml` handles this. Run pytest via:
+```bash
+cd apps/api && uv run pytest   # ✅ correct
+# not: python -m pytest        # ❌ may miss pythonpath config
+```
+
+### Schema changes not reflected after editing `schema.prisma`
+Run:
+```bash
+pnpm db:push
+# This syncs PostgreSQL and regenerates the Python client
+```
+
+### MinIO bucket does not exist error
+Create the bucket manually:
+```bash
+docker exec -it file_hub_minio mc alias set local http://localhost:9000 admin password123
+docker exec -it file_hub_minio mc mb local/filehub-bucket
+```
+Or use the MinIO Console at [http://localhost:9001](http://localhost:9001).
+
+### Clean slate (wipe everything and start fresh)
+```bash
+docker compose down -v          # removes all data volumes
+docker compose up -d
+pnpm db:push                    # recreate schema
+```
