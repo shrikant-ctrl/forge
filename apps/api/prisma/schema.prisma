@@ -23,6 +23,7 @@ model User {
   id           String      @id @default(uuid())
   email        String      @unique
   name         String
+  passwordHash String      @map("password_hash")
   role         Role        @default(USER)
   storageQuota BigInt      @default(10737418240) @map("storage_quota") // 10 GB default
   usedStorage  BigInt      @default(0) @map("used_storage")

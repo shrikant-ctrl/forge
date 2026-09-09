@@ -339,6 +339,8 @@ async def list_files(db: Prisma = Depends(get_db)):
 
 ---
 
+---
+
 ## Repository Structure
 
 ```text
@@ -347,16 +349,51 @@ forge/
 │   └── rules/
 │       └── architecture.md     # Engineering standards & constraints
 ├── apps/
-│   ├── api/                    # FastAPI Backend Application
+│   ├── api/                    # FastAPI Backend (NestJS Modular Architecture)
 │   │   ├── app/
-│   │   │   ├── core/
+│   │   │   ├── core/           # Core singletons & configurations
 │   │   │   │   ├── config.py   # Pydantic Settings & environment validation
-│   │   │   │   └── db.py       # Prisma client singleton & FastAPI get_db dependency
-│   │   │   └── main.py         # FastAPI application entrypoint with Prisma lifespan
+│   │   │   │   ├── db.py       # Prisma client singleton & get_db dependency
+│   │   │   │   ├── security.py # bcrypt password hashing & JWT token management
+│   │   │   │   └── exceptions.py # NestJS-style HttpException hierarchy
+│   │   │   │
+│   │   │   ├── common/         # Cross-cutting concerns
+│   │   │   │   ├── guards/     # NestJS Guards
+│   │   │   │   │   ├── auth_guard.py   # JWT Bearer token authentication guard
+│   │   │   │   │   └── roles_guard.py  # RBAC role authorization guard
+│   │   │   │   └── filters/    # Exception Filters
+│   │   │   │       └── http_exception_filter.py # Standardized NestJS JSON error payloads
+│   │   │   │
+│   │   │   ├── modules/        # Domain Feature Modules
+│   │   │   │   ├── auth/       # Authentication Module
+│   │   │   │   │   ├── auth_controller.py # /api/auth endpoints (register, login, me)
+│   │   │   │   │   ├── auth_service.py    # Injectable AuthService business logic
+│   │   │   │   │   └── dto/
+│   │   │   │   │       └── auth_dto.py    # RegisterDto, LoginDto, TokenResponseDto, UserDto
+│   │   │   │   │
+│   │   │   │   ├── folders/    # Folders Module
+│   │   │   │   │   ├── folders_controller.py # /api/folders endpoints (CRUD, tree, move)
+│   │   │   │   │   ├── folders_service.py    # Injectable FoldersService provider
+│   │   │   │   │   └── dto/
+│   │   │   │   │       └── folders_dto.py    # CreateFolderDto, UpdateFolderDto, FolderResponseDto
+│   │   │   │   │
+│   │   │   │   ├── files/      # Files Module
+│   │   │   │   │   ├── files_controller.py   # /api/files endpoints (upload, download, CRUD)
+│   │   │   │   │   ├── files_service.py      # Injectable FilesService provider & quota tracking
+│   │   │   │   │   └── dto/
+│   │   │   │   │       └── files_dto.py      # InitUploadDto, CompleteUploadDto, FileResponseDto
+│   │   │   │   │
+│   │   │   │   └── storage/    # Storage Module
+│   │   │   │       └── storage_service.py    # S3 / MinIO presigned URL generator & blob manager
+│   │   │   │
+│   │   │   └── main.py         # Application root mounting module routers & exception filters
+│   │   │
 │   │   ├── prisma/
 │   │   │   └── schema.prisma   # Declarative database models (User, Folder, File, etc.)
-│   │   ├── package.json        # Workspace scripts (db:push, db:studio, dev)
-│   │   ├── pyproject.toml      # Python dependencies (FastAPI, Prisma, Uvicorn)
+│   │   ├── tests/              # Integration and end-to-end test suite
+│   │   │   └── test_api_flow.py # Full flow tests: Auth, Folders, File uploads, Error filters
+│   │   ├── package.json        # Workspace scripts (dev, test, lint, db:push, db:studio)
+│   │   ├── pyproject.toml      # Python dependencies (FastAPI, Prisma, bcrypt, boto3, pyjwt)
 │   │   └── uv.lock             # Deterministic Python dependency lock
 │   │
 │   └── web/                    # TanStack React Frontend Application
