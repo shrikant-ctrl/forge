@@ -2,11 +2,12 @@
 
 [![Architecture](https://img.shields.io/badge/Architecture-Monorepo%20(Turborepo%20%2B%20pnpm)-blue.svg)](#architecture)
 [![Backend](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.14-009688.svg)](#backend)
+[![ORM](https://img.shields.io/badge/ORM-Prisma%20for%20Python-2D3748.svg)](#database--schema-management)
 [![Frontend](https://img.shields.io/badge/Frontend-TanStack%20React%20%7C%20Vite-61DAFB.svg)](#frontend)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%2016-336791.svg)](#infrastructure)
 [![Storage](https://img.shields.io/badge/Storage-MinIO%20(S3%20Compatible)-C72C48.svg)](#infrastructure)
 
-**Forge** is an enterprise-grade, high-performance internal file hub (a "Mini Google Drive") engineered with a modern, scalable monorepo architecture. It delivers secure blob storage, hierarchical folder management, granular role-based access control (RBAC), and background processing.
+**Forge** is an enterprise-grade, high-performance internal file hub (a "Mini Google Drive") engineered with a modern, scalable monorepo architecture. It delivers secure blob storage, hierarchical folder management, granular role-based access control (RBAC), and zero-hassle schema synchronization powered by **Prisma for Python**.
 
 For comprehensive product specifications and screen workflows, consult:
 - [Software Requirements Specification (SRS)](./docs/SRS_Internal_File_Hub.md)
@@ -25,13 +26,14 @@ For comprehensive product specifications and screen workflows, consult:
    - [Step 3: Environment Variables](#step-3-environment-variables)
    - [Step 4: Install Dependencies](#step-4-install-dependencies)
    - [Step 5: Spin Up Infrastructure (Docker)](#step-5-spin-up-infrastructure-docker)
-   - [Step 6: Database Migrations (Alembic)](#step-6-database-migrations-alembic)
+   - [Step 6: Database Schema Synchronization (Prisma)](#step-6-database-schema-synchronization-prisma)
    - [Step 7: Launch Development Servers](#step-7-launch-development-servers)
 5. [Endpoints & Verification](#endpoints--verification)
 6. [Monorepo Scripts & Cheatsheet](#monorepo-scripts--cheatsheet)
-7. [Repository Structure](#repository-structure)
-8. [Troubleshooting & FAQ](#troubleshooting--faq)
-9. [Engineering Guidelines](#engineering-guidelines)
+7. [Database & Schema Management (Prisma)](#database--schema-management)
+8. [Repository Structure](#repository-structure)
+9. [Troubleshooting & FAQ](#troubleshooting--faq)
+10. [Engineering Guidelines](#engineering-guidelines)
 
 ---
 
@@ -49,7 +51,7 @@ For comprehensive product specifications and screen workflows, consult:
                         │    Python 3.14+ (Async I/O)   │
                         └───┬───────────┬───────────┬───┘
                             │           │           │
-     SQLAlchemy / asyncpg   │           │ Redis     │ Presigned URLs / Boto3
+           Prisma Client    │           │ Redis     │ Presigned URLs / Boto3
                             ▼           ▼           ▼
                    ┌────────────┐ ┌───────────┐ ┌─────────────┐
                    │ PostgreSQL │ │   Redis   │ │    MinIO    │
@@ -59,9 +61,9 @@ For comprehensive product specifications and screen workflows, consult:
 ```
 
 The system separates metadata concerns from binary storage:
-- **Relational Integrity**: File hierarchies, permissions, audit logs, and user sessions are persisted in PostgreSQL.
-- **Direct & Secure Blob Delivery**: Files are stored in S3/MinIO. Downloads and uploads leverage short-lived signed URLs to prevent API bottlenecking.
-- **Micro-tasks & Caching**: Redis coordinates background tasks (thumbnail generation, metadata extraction) and distributed rate limiting.
+- **Relational Integrity via Prisma**: Schema models, folder hierarchies, permissions, audit logs, and user sessions are declared in `apps/api/prisma/schema.prisma` and queried via the auto-generated, type-safe async Prisma Python client.
+- **Direct & Secure Blob Delivery**: Files are stored in S3/MinIO. Downloads and uploads leverage short-lived signed URLs to eliminate API proxy bottlenecking.
+- **Background Tasks & Caching**: Redis coordinates asynchronous operations (thumbnail generation, metadata extraction) and distributed rate limiting.
 
 ---
 
@@ -71,10 +73,11 @@ The system separates metadata concerns from binary storage:
 | :--- | :--- | :--- | :--- |
 | **Monorepo Engine** | [Turborepo](https://turbo.build/) + [pnpm](https://pnpm.io/) | Turbo 2.x, pnpm 10.x | N/A |
 | **Frontend** | React 19, [TanStack Router](https://tanstack.com/router), [TanStack Query](https://tanstack.com/query), TailwindCSS v4 | Vite 8, Biome | `3000` |
-| **Backend** | [FastAPI](https://fastapi.tiangolo.com/), Pydantic v2, SQLAlchemy 2 (async), Alembic | Python 3.14+, uv | `8000` |
-| **Database** | PostgreSQL | 16-alpine (Docker) | `5432` |
-| **Cache / Queue** | Redis | 7-alpine (Docker) | `6379` |
-| **Object Storage** | MinIO (S3-compatible) | Latest (Docker) | `9000` (API), `9001` (Console) |
+| **Backend** | [FastAPI](https://fastapi.tiangolo.com/), Pydantic v2, Uvicorn | Python 3.14+, uv | `8000` |
+| **ORM & Schema** | [Prisma for Python](https://prisma-client-py.readthedocs.io/) (`prisma-client-py`) | 0.15.x | N/A |
+| **Database** | PostgreSQL | 16-alpine | `5432` |
+| **Cache / Queue** | Redis | 7-alpine | `6379` |
+| **Object Storage** | MinIO (S3-compatible) | Latest | `9000` (API), `9001` (Console) |
 
 ---
 
@@ -86,7 +89,7 @@ Ensure the following tools are installed on your host system:
 - **pnpm**: `v10.x` (Recommended via Corepack or standalone install)
 - **Python**: `3.14+`
 - **[uv](https://github.com/astral-sh/uv)**: Astral's high-performance Python package and virtualenv manager
-- **Docker & Docker Compose**: Docker Engine `24.x+` with Compose V2
+- **Docker & Docker Compose**: Engine `24.x+` with Compose V2 (or native PostgreSQL/Redis/MinIO services)
 
 ---
 
@@ -115,7 +118,6 @@ cd forge
    ```
 
 2. **Verify `uv` installation**:
-   If you do not have `uv` installed:
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
@@ -134,11 +136,11 @@ Forge includes a pre-configured `.env.example`. Create your local environment fi
 cp .env.example .env
 ```
 
-Review and customize values in `.env` if needed:
+Review values in `.env`:
 
 ```ini
-# Backend Database & Cache
-DATABASE_URL=postgresql+asyncpg://admin:password@localhost:5432/file_hub
+# Backend Database & Cache (Standard PostgreSQL URL for Prisma)
+DATABASE_URL=postgresql://admin:password@localhost:5432/file_hub
 REDIS_URL=redis://localhost:6379/0
 
 # JWT & Authentication Security
@@ -163,7 +165,7 @@ Install all root, web, and workspace JavaScript/TypeScript dependencies:
 pnpm install
 ```
 
-Initialize the Python backend virtual environment and lockfile:
+Initialize the Python backend virtual environment and install all packages:
 
 ```bash
 cd apps/api
@@ -181,22 +183,16 @@ Start the backing PostgreSQL database, Redis instance, and MinIO storage engine 
 docker compose up -d
 ```
 
-Verify that all three containers are healthy and running:
+Verify that containers are running:
 
 ```bash
 docker compose ps
 ```
 
-Expected output:
-```text
-NAME              IMAGE              COMMAND                  SERVICE   STATUS    PORTS
-file_hub_db       postgres:16-alpine "docker-entrypoint.s…"   db        running   0.0.0.0:5432->5432/tcp
-file_hub_minio    minio/minio:latest "/usr/bin/docker-ent…"   minio     running   0.0.0.0:9000->9000/tcp, 0.0.0.0:9001->9001/tcp
-file_hub_redis    redis:7-alpine     "docker-entrypoint.s…"   redis     running   0.0.0.0:6379->6379/tcp
-```
+> **Note**: If your machine already runs PostgreSQL, Redis, or MinIO natively on standard ports (`5432`, `6379`, `9000`, `9001`), Docker is not required; the app will connect directly to the active host services.
 
 #### MinIO Bucket Setup
-1. Navigate to the MinIO Web Console at [http://localhost:9001](http://localhost:9001).
+1. Open the MinIO Web Console at [http://localhost:9001](http://localhost:9001).
 2. Log in with:
    - **Username**: `admin`
    - **Password**: `password123`
@@ -204,23 +200,20 @@ file_hub_redis    redis:7-alpine     "docker-entrypoint.s…"   redis     runnin
 
 ---
 
-### Step 6: Database Migrations (Alembic)
+### Step 6: Database Schema Synchronization (Prisma)
 
-Run database migrations to ensure the relational schema matches the application models:
+Forge uses **Prisma for Python** for zero-hassle database synchronization. You do **not** need to manually generate or run migration scripts.
+
+From the repository root, run:
 
 ```bash
-cd apps/api
-uv run alembic upgrade head
-cd ../..
+pnpm db:push
 ```
 
-> **Note**: To autogenerate a new migration after updating SQLAlchemy models:
-> ```bash
-> cd apps/api
-> uv run alembic revision --autogenerate -m "create_file_and_folder_models"
-> uv run alembic upgrade head
-> cd ../..
-> ```
+This command:
+1. Compares `apps/api/prisma/schema.prisma` with your PostgreSQL database.
+2. **Automatically creates new tables, alters existing columns, and drops removed fields**.
+3. Generates the strictly typed async Python client into `apps/api/.venv`.
 
 ---
 
@@ -233,7 +226,7 @@ From the root directory, launch Turborepo to run the FastAPI backend and TanStac
 pnpm run dev
 ```
 
-Turborepo will stream hot-reloaded logs from both `apps/api` and `apps/web`.
+> **Zero-Touch Schema Sync**: The `pnpm run dev` task automatically runs `prisma db push` on boot. Every time you start the app, your database schema is guaranteed to match your Prisma definitions!
 
 #### Option B: Run Services Individually
 
@@ -241,7 +234,7 @@ Turborepo will stream hot-reloaded logs from both `apps/api` and `apps/web`.
   ```bash
   pnpm --filter api dev
   # or directly:
-  cd apps/api && uv run fastapi dev app/main.py
+  cd apps/api && uv run prisma db push && uv run fastapi dev app/main.py
   ```
 
 - **React Web Frontend only**:
@@ -261,9 +254,10 @@ Once the stack is running, verify each endpoint:
 | :--- | :--- | :--- |
 | **Web Application** | [http://localhost:3000](http://localhost:3000) | Main React SPA Dashboard & Explorer |
 | **FastAPI Backend** | [http://localhost:8000](http://localhost:8000) | Root API endpoint |
-| **API Health Check** | [http://localhost:8000/health](http://localhost:8000/health) | Verifies API liveness (`{"status":"ok"}`) |
-| **Interactive API Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Swagger UI for testing API endpoints |
+| **API Health Check** | [http://localhost:8000/health](http://localhost:8000/health) | Verifies API & DB connection (`{"status":"ok","database":"connected"}`) |
+| **Interactive API Docs** | [http://localhost:8000/docs](http://localhost:8000/docs) | Swagger UI for interactive testing |
 | **Alternative API Docs** | [http://localhost:8000/redoc](http://localhost:8000/redoc) | ReDoc schema documentation |
+| **Prisma Studio (GUI)** | [http://localhost:5555](http://localhost:5555) | Visual database browser (`pnpm db:studio`) |
 | **MinIO Console** | [http://localhost:9001](http://localhost:9001) | User: `admin` \| Pass: `password123` |
 | **MinIO S3 API** | [http://localhost:9000](http://localhost:9000) | Direct S3 endpoint |
 | **PostgreSQL Database** | `localhost:5432` | DB: `file_hub` \| User: `admin` \| Pass: `password` |
@@ -273,18 +267,18 @@ Once the stack is running, verify each endpoint:
 
 ```bash
 curl http://localhost:8000/health
-# Response: {"status":"ok"}
+# Response: {"status":"ok","database":"connected"}
 ```
 
 ---
 
 ## Monorepo Scripts & Cheatsheet
 
-### Root Turborepo Commands
+### Root Monorepo Commands
 
 | Command | Action |
 | :--- | :--- |
-| `pnpm run dev` | Runs both backend and frontend development servers concurrently with hot-reloading |
+| `pnpm run dev` | Runs `prisma db push` and starts backend and frontend development servers concurrently |
 | `pnpm run build` | Builds production artifacts for all packages |
 | `pnpm run lint` | Runs linters across packages (`ruff check .` on backend, `biome lint` on frontend) |
 | `pnpm run format` | Auto-formats code across packages (`ruff format .` on backend, `biome format` on frontend) |
@@ -292,35 +286,55 @@ curl http://localhost:8000/health
 | `pnpm run test` | Executes unit and integration test suites |
 | `pnpm run clean` | Cleans build outputs, temporary directories, and Turbo caches |
 
-### Workspace-Specific Commands
+### Database Commands (Prisma)
 
-```bash
-# Frontend specific (apps/web)
-pnpm --filter web generate-routes  # Generates TanStack file-based routes
-pnpm --filter web check            # Runs Biome formatting and lint verification
-pnpm --filter web build            # Production Vite bundle
+| Command | Action |
+| :--- | :--- |
+| `pnpm db:push` | Syncs `schema.prisma` directly with PostgreSQL and regenerates the Python client |
+| `pnpm db:studio` | Launches Prisma Studio GUI on `http://localhost:5555` to browse and edit records |
+| `pnpm db:generate` | Manually regenerates the Python client types from `schema.prisma` |
 
-# Backend specific (apps/api)
-cd apps/api
-uv run ruff check . --fix          # Auto-fix Python linting issues
-uv run ruff format .               # Format Python files
-uv run pytest                      # Run backend tests
-```
+---
 
-### Docker Infrastructure Management
+## Database & Schema Management (Prisma)
 
-```bash
-# Stop all infrastructure containers
-docker compose stop
+### Modifying Schema (TypeORM-Style Workflow)
+All database models live in **`apps/api/prisma/schema.prisma`**.
 
-# Restart infrastructure containers
-docker compose restart
+When you need to add, alter, or remove fields:
+1. Edit `apps/api/prisma/schema.prisma`:
+   ```prisma
+   model File {
+     id          String   @id @default(uuid())
+     name        String
+     sizeBytes   BigInt   @map("size_bytes")
+     mimeType    String   @map("mime_type")
+     storageKey  String   @unique @map("storage_key")
+     // Add new fields directly here:
+     isFavorite  Boolean  @default(false) @map("is_favorite")
+     ...
+   }
+   ```
+2. Run `pnpm db:push` (or simply run `pnpm dev`).
+3. PostgreSQL is updated immediately and Python client types are re-generated. **No migration files, no Alembic hassle.**
 
-# Tear down infrastructure (preserves volume data)
-docker compose down
+### Using the Prisma Client in FastAPI
+Use the `db` client singleton in `app/core/db.py`:
 
-# Tear down infrastructure AND remove data volumes (clean reset)
-docker compose down -v
+```python
+from fastapi import APIRouter, Depends
+from prisma import Prisma
+from app.core.db import get_db
+
+router = APIRouter()
+
+@router.get("/files")
+async def list_files(db: Prisma = Depends(get_db)):
+    files = await db.file.find_many(
+        where={"isDeleted": False},
+        include={"owner": True, "versions": True}
+    )
+    return files
 ```
 
 ---
@@ -336,13 +350,13 @@ forge/
 │   ├── api/                    # FastAPI Backend Application
 │   │   ├── app/
 │   │   │   ├── core/
-│   │   │   │   └── config.py   # Pydantic Settings & environment validation
-│   │   │   └── main.py         # FastAPI application entrypoint & routing
-│   │   ├── migrations/         # Alembic database migrations
-│   │   │   └── env.py          # Async migration harness
-│   │   ├── alembic.ini         # Alembic configuration
-│   │   ├── package.json        # Workspace scripts for Turbo
-│   │   ├── pyproject.toml      # Python dependencies (uv/pip)
+│   │   │   │   ├── config.py   # Pydantic Settings & environment validation
+│   │   │   │   └── db.py       # Prisma client singleton & FastAPI get_db dependency
+│   │   │   └── main.py         # FastAPI application entrypoint with Prisma lifespan
+│   │   ├── prisma/
+│   │   │   └── schema.prisma   # Declarative database models (User, Folder, File, etc.)
+│   │   ├── package.json        # Workspace scripts (db:push, db:studio, dev)
+│   │   ├── pyproject.toml      # Python dependencies (FastAPI, Prisma, Uvicorn)
 │   │   └── uv.lock             # Deterministic Python dependency lock
 │   │
 │   └── web/                    # TanStack React Frontend Application
@@ -364,7 +378,7 @@ forge/
 │   └── SRS_Internal_File_Hub.md# Software Requirements Specification
 │
 ├── docker-compose.yml          # PostgreSQL, Redis, and MinIO definitions
-├── package.json                # Monorepo root configuration
+├── package.json                # Monorepo root configuration & db:* scripts
 ├── pnpm-lock.yaml              # Root dependency lockfile
 ├── pnpm-workspace.yaml         # pnpm workspace configuration
 ├── turbo.json                  # Turborepo task pipeline configuration
@@ -376,48 +390,36 @@ forge/
 
 ## Troubleshooting & FAQ
 
-### 1. `pnpm: command not found` or `cannot find binary path`
-Ensure Corepack has placed `pnpm` in your system `PATH`:
+### 1. `DATABASE_URL` Format
+Prisma expects standard PostgreSQL connection URIs:
+```text
+postgresql://admin:password@localhost:5432/file_hub
+```
+Do **not** include Python driver prefixes like `postgresql+asyncpg://` or `postgresql+psycopg2://`.
+
+### 2. `Environment variable not found: DATABASE_URL`
+Ensure `.env` exists in the root directory. `apps/api/.env` is symlinked to the root `.env` to ensure both Prisma CLI and Python scripts read identical configurations.
+```bash
+cp .env.example .env
+ln -sf ../../.env apps/api/.env
+```
+
+### 3. `pnpm: command not found`
+Ensure Corepack has linked `pnpm` to your system `PATH`:
 ```bash
 corepack enable --install-directory ~/.local/bin
 export PATH="$HOME/.local/bin:$PATH"
 ```
-Or install `pnpm` globally via npm:
-```bash
-npm install -g pnpm@10.32.1
-```
 
-### 2. Port Collisions
-Ensure ports `3000`, `8000`, `5432`, `6379`, `9000`, and `9001` are not in use by existing background services:
-```bash
-# Inspect port binding (Linux/macOS)
-lsof -i :5432 -i :8000 -i :3000 -i :9000
-```
-If a port is already taken, update the respective mapping in `docker-compose.yml` or port parameter in `package.json`.
+### 4. Port Collisions
+Ensure ports `3000`, `8000`, `5432`, `6379`, `9000`, and `9001` are available. If PostgreSQL, Redis, or MinIO are already running natively on your machine, Docker Compose is not required.
 
-### 3. MinIO Bucket Missing / S3 Connection Refused
-If the backend throws an `EndpointConnectionError` or `NoSuchBucket` error:
-1. Confirm MinIO is running: `docker compose ps minio`
-2. Ensure you have created the bucket `filehub-bucket` via the MinIO console at `http://localhost:9001` or via `mc`:
-   ```bash
-   docker exec -it file_hub_minio mc alias set local http://localhost:9000 admin password123
-   docker exec -it file_hub_minio mc mb local/filehub-bucket
-   ```
-
-### 4. Database Connection Refused (`connection to server at "localhost", port 5432 failed`)
-Verify PostgreSQL is healthy:
+### 5. Inspecting Database Records Visually
+Run Prisma Studio from the root of the repository:
 ```bash
-docker compose logs db
+pnpm db:studio
 ```
-Wait 5–10 seconds after running `docker compose up -d` for PostgreSQL to finish its initialization routine before running migrations.
-
-### 5. Resetting Database to Clean State
-To wipe out all local data volumes and start fresh:
-```bash
-docker compose down -v
-docker compose up -d
-cd apps/api && uv run alembic upgrade head && cd ../..
-```
+Open [http://localhost:5555](http://localhost:5555) in your browser to view, search, and edit records visually.
 
 ---
 
@@ -426,12 +428,12 @@ cd apps/api && uv run alembic upgrade head && cd ../..
 Adhere to the standards codified in [architecture.md](.agents/rules/architecture.md):
 
 1. **Strict Type Safety**:
-   - Backend: All schemas must use Pydantic models. Ensure complete type annotations for all functions.
-   - Frontend: Strict TypeScript (`noEmit`, Zod runtime validation where relevant).
+   - Backend: All queries leverage auto-generated, type-safe Prisma client types. Validate request and response payloads with Pydantic.
+   - Frontend: Strict TypeScript (`tsc --noEmit`, Zod runtime validation).
 2. **Security & Data Access**:
    - Never expose raw disk file paths.
-   - Upload and download requests must utilize secure, short-lived signed S3 URLs.
-   - API endpoints require role-based access control (RBAC) validation.
+   - File uploads and downloads must utilize secure, short-lived signed S3/MinIO URLs.
+   - API endpoints enforce Role-Based Access Control (RBAC) via the `Role` enum in `schema.prisma`.
 3. **Database Integrity**:
-   - Prefer database foreign key constraints and transactional boundaries for folder operations.
-   - Use soft deletion for file recovery.
+   - Relational cascading rules (`onDelete: Cascade`) are defined at the database layer in `schema.prisma`.
+   - Soft-deletion (`isDeleted`, `deletedAt`) is supported for trash and recovery features.
