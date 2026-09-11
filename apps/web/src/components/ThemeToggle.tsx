@@ -49,9 +49,11 @@ function systemTheme(): Theme {
 		: "light";
 }
 
+const DEFAULT_MODE: ThemeMode = "silk";
+
 function getInitialMode(): ThemeMode {
 	if (typeof window === "undefined") {
-		return "auto";
+		return DEFAULT_MODE;
 	}
 
 	const stored = window.localStorage.getItem("theme");
@@ -62,7 +64,7 @@ function getInitialMode(): ThemeMode {
 		return stored as ThemeMode;
 	}
 
-	return "auto";
+	return DEFAULT_MODE;
 }
 
 function applyThemeMode(mode: ThemeMode) {
@@ -73,7 +75,7 @@ function applyThemeMode(mode: ThemeMode) {
 }
 
 export default function ThemeToggle() {
-	const [mode, setMode] = useState<ThemeMode>("auto");
+	const [mode, setMode] = useState<ThemeMode>(DEFAULT_MODE);
 
 	useEffect(() => {
 		const initialMode = getInitialMode();

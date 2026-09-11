@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import DriveBrowser from "../../components/drive/DriveBrowser";
+import { folderFilesQueryOptions } from "../../lib/files/queries";
 import {
 	folderDetailQueryOptions,
 	foldersQueryOptions,
@@ -12,6 +13,9 @@ export const Route = createFileRoute("/_app/drive/$folderId")({
 				folderDetailQueryOptions(params.folderId),
 			),
 			context.queryClient.ensureQueryData(foldersQueryOptions(params.folderId)),
+			context.queryClient.ensureQueryData(
+				folderFilesQueryOptions(params.folderId),
+			),
 		]);
 	},
 	errorComponent: () => (

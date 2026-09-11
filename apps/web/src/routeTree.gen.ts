@@ -16,6 +16,7 @@ import { Route as AppDriveRouteImport } from './routes/_app/drive'
 import { Route as AppRecentRouteImport } from './routes/_app/recent'
 import { Route as AppSearchRouteImport } from './routes/_app/search'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppDriveIndexRouteImport } from './routes/_app/drive.index'
 import { Route as AppDriveFolderIdRouteImport } from './routes/_app/drive.$folderId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -52,6 +53,11 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDriveIndexRoute = AppDriveIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppDriveRoute,
+} as any)
 const AppDriveFolderIdRoute = AppDriveFolderIdRouteImport.update({
   id: '/$folderId',
   path: '/$folderId',
@@ -66,15 +72,16 @@ export interface FileRoutesByFullPath {
   '/search': typeof AppSearchRoute
   '/settings': typeof AppSettingsRoute
   '/drive/$folderId': typeof AppDriveFolderIdRoute
+  '/drive/': typeof AppDriveIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/drive': typeof AppDriveRouteWithChildren
   '/recent': typeof AppRecentRoute
   '/search': typeof AppSearchRoute
   '/settings': typeof AppSettingsRoute
   '/drive/$folderId': typeof AppDriveFolderIdRoute
+  '/drive': typeof AppDriveIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,6 +93,7 @@ export interface FileRoutesById {
   '/_app/search': typeof AppSearchRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/drive/$folderId': typeof AppDriveFolderIdRoute
+  '/_app/drive/': typeof AppDriveIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -97,15 +105,16 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/drive/$folderId'
+    | '/drive/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
-    | '/drive'
     | '/recent'
     | '/search'
     | '/settings'
     | '/drive/$folderId'
+    | '/drive'
   id:
     | '__root__'
     | '/'
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/_app/search'
     | '/_app/settings'
     | '/_app/drive/$folderId'
+    | '/_app/drive/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -175,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/drive/': {
+      id: '/_app/drive/'
+      path: '/'
+      fullPath: '/drive/'
+      preLoaderRoute: typeof AppDriveIndexRouteImport
+      parentRoute: typeof AppDriveRoute
+    }
     '/_app/drive/$folderId': {
       id: '/_app/drive/$folderId'
       path: '/$folderId'
@@ -187,10 +204,12 @@ declare module '@tanstack/react-router' {
 
 interface AppDriveRouteChildren {
   AppDriveFolderIdRoute: typeof AppDriveFolderIdRoute
+  AppDriveIndexRoute: typeof AppDriveIndexRoute
 }
 
 const AppDriveRouteChildren: AppDriveRouteChildren = {
   AppDriveFolderIdRoute: AppDriveFolderIdRoute,
+  AppDriveIndexRoute: AppDriveIndexRoute,
 }
 
 const AppDriveRouteWithChildren = AppDriveRoute._addFileChildren(

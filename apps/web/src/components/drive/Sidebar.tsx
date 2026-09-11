@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import { useRef } from "react";
 import { meQueryOptions } from "../../lib/auth/queries";
 import { formatBytes } from "../../lib/format";
@@ -12,7 +12,8 @@ export default function Sidebar() {
 	const { startUpload } = useUploads();
 	const { openModal } = useUiState();
 	const fileInputRef = useRef<HTMLInputElement>(null);
-	const navigate = useNavigate();
+	const { folderId } = useParams({ strict: false });
+	const currentFolderId = folderId ?? null;
 	const usedPct = Math.min(
 		100,
 		Math.round((user.usedStorage / user.storageQuota) * 100),
@@ -37,10 +38,9 @@ export default function Sidebar() {
 					<li>
 						<button
 							type="button"
-							onClick={() => {
-								navigate({ to: "/drive" });
-								openModal({ type: "new-folder", parentId: null });
-							}}
+							onClick={() =>
+								openModal({ type: "new-folder", parentId: currentFolderId })
+							}
 						>
 							<FolderIcon className="size-4" /> New folder
 						</button>
@@ -54,8 +54,7 @@ export default function Sidebar() {
 				className="hidden"
 				onChange={(e) => {
 					if (e.target.files?.length) {
-						startUpload(e.target.files, null);
-						navigate({ to: "/drive" });
+						startUpload(e.target.files, currentFolderId);
 					}
 					e.target.value = "";
 				}}

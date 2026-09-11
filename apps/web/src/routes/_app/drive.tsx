@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import DriveBrowser from "../../components/drive/DriveBrowser";
-import { foldersQueryOptions } from "../../lib/folders/queries";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 
+// ponytail: this file's naming (`drive.tsx` alongside `drive.$folderId.tsx`)
+// makes it the parent layout route for both `/drive` and `/drive/$folderId`
+// in TanStack Router's flat-file convention — it must render an Outlet, or
+// the `$folderId` child route can never mount. The actual `/drive` root-view
+// content lives in the sibling index route, `drive.index.tsx`.
 export const Route = createFileRoute("/_app/drive")({
-	loader: async ({ context }) => {
-		await context.queryClient.ensureQueryData(foldersQueryOptions(null));
-	},
-	component: () => <DriveBrowser folderId={null} />,
+	component: Outlet,
 });
