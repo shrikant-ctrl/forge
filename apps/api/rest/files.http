@@ -18,7 +18,7 @@ POST {{BASE_URL}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "alice@company.com",
+  "email": "shrikant@infocusp.com",
   "password": "supersecret123"
 }
 
