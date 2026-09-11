@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -42,3 +44,13 @@ def create_access_token(
 def decode_access_token(token: str) -> dict[str, Any]:
     """Decode and validate a JWT access token."""
     return jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+
+
+def generate_refresh_token() -> str:
+    """Generate a high-entropy opaque refresh token (validated via DB lookup, not a JWT)."""
+    return secrets.token_urlsafe(48)
+
+
+def hash_token(token: str) -> str:
+    """Hash an opaque token for storage/lookup (SHA-256, not bcrypt: the input is already high-entropy)."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()

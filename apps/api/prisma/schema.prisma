@@ -30,9 +30,10 @@ model User {
   createdAt    DateTime    @default(now()) @map("created_at")
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
-  folders      Folder[]
-  files        File[]
-  shareLinks   ShareLink[]
+  folders       Folder[]
+  files         File[]
+  shareLinks    ShareLink[]
+  refreshTokens RefreshToken[]
 
   @@map("users")
 }
@@ -95,6 +96,20 @@ model FileVersion {
 
   @@unique([fileId, versionNumber])
   @@map("file_versions")
+}
+
+model RefreshToken {
+  id                  String    @id @default(uuid())
+  tokenHash           String    @unique @map("token_hash")
+  userId              String    @map("user_id")
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt           DateTime  @map("expires_at")
+  revokedAt           DateTime? @map("revoked_at")
+  replacedByTokenHash String?   @map("replaced_by_token_hash")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 model ShareLink {

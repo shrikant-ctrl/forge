@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # S3 / MinIO
     AWS_ACCESS_KEY_ID: str

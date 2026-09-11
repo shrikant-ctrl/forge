@@ -87,3 +87,58 @@ def test_auth_and_module_flow(setup_teardown):
     assert "message" in err_json
     assert "timestamp" in err_json
     assert "path" in err_json
+
+
+def test_refresh_token_flow(setup_teardown):
+    client = setup_teardown
+    unique_email = "refresh-flow@example.com"
+
+    client.post(
+        "/api/auth/register",
+        json={"email": unique_email, "password": "SuperSecretPassword123!", "name": "Refresh Flow"},
+    )
+    login_res = client.post(
+        "/api/auth/login",
+        json={"email": unique_email, "password": "SuperSecretPassword123!"},
+    )
+    assert login_res.status_code == 200
+    tokens = login_res.json()
+    assert "refreshToken" in tokens
+    old_refresh_token = tokens["refreshToken"]
+
+    # 1. Rejects an unknown refresh token
+    bad_res = client.post("/api/auth/refresh", json={"refreshToken": "not-a-real-token"})
+    assert bad_res.status_code == 401
+
+    # 2. Rotates a valid refresh token for a new pair
+    refresh_res = client.post("/api/auth/refresh", json={"refreshToken": old_refresh_token})
+    assert refresh_res.status_code == 200
+    new_tokens = refresh_res.json()
+    assert new_tokens["refreshToken"] != old_refresh_token
+    assert new_tokens["accessToken"]
+
+    # 3. Reusing the now-rotated (revoked) token is rejected
+    reuse_res = client.post("/api/auth/refresh", json={"refreshToken": old_refresh_token})
+    assert reuse_res.status_code == 401
+
+    # 4. Reuse detection also revokes the token issued by the rotation (whole session tree killed)
+    rotated_again_res = client.post("/api/auth/refresh", json={"refreshToken": new_tokens["refreshToken"]})
+    assert rotated_again_res.status_code == 401
+
+    # 5. Logout revokes a still-valid refresh token
+    login_res_2 = client.post(
+        "/api/auth/login",
+        json={"email": unique_email, "password": "SuperSecretPassword123!"},
+    )
+    tokens_2 = login_res_2.json()
+    headers_2 = {"Authorization": f"Bearer {tokens_2['accessToken']}"}
+
+    logout_res = client.post(
+        "/api/auth/logout",
+        headers=headers_2,
+        json={"refreshToken": tokens_2["refreshToken"]},
+    )
+    assert logout_res.status_code == 204
+
+    post_logout_refresh_res = client.post("/api/auth/refresh", json={"refreshToken": tokens_2["refreshToken"]})
+    assert post_logout_refresh_res.status_code == 401

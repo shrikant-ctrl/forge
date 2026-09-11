@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends
@@ -9,14 +10,23 @@ from app.core.exceptions import (
     ConflictException,
     UnauthorizedException,
 )
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    generate_refresh_token,
+    hash_password,
+    hash_token,
+    verify_password,
+)
 from app.modules.auth.dto.auth_dto import (
     LoginDto,
+    RefreshTokenDto,
     RegisterDto,
     TokenResponseDto,
     UserDto,
 )
 from prisma import Prisma
+
+REFRESH_TOKEN_REUSE_MESSAGE = "Refresh token has already been used; all sessions have been revoked"
 
 
 class AuthService:
@@ -56,17 +66,69 @@ class AuthService:
         if not user or not verify_password(dto.password, user.passwordHash):
             raise UnauthorizedException("Invalid email or password")
 
-        access_token = create_access_token(
-            subject=user.id,
-            claims={
-                "role": user.role.value
-                if hasattr(user.role, "value")
-                else str(user.role)
+        role = user.role.value if hasattr(user.role, "value") else str(user.role)
+        return await self._issue_tokens(user.id, role)
+
+    async def refresh(self, dto: RefreshTokenDto) -> TokenResponseDto:
+        token_hash = hash_token(dto.refreshToken)
+        stored = await self.db.refreshtoken.find_unique(where={"tokenHash": token_hash})
+        if not stored:
+            raise UnauthorizedException("Invalid refresh token")
+
+        if stored.revokedAt is not None:
+            # Reuse of an already-rotated token is a signal of theft: kill every active session.
+            await self.db.refreshtoken.update_many(
+                where={"userId": stored.userId, "revokedAt": None},
+                data={"revokedAt": datetime.now(UTC)},
+            )
+            raise UnauthorizedException(REFRESH_TOKEN_REUSE_MESSAGE)
+
+        if stored.expiresAt < datetime.now(UTC):
+            raise UnauthorizedException("Refresh token has expired")
+
+        user = await self.db.user.find_unique(where={"id": stored.userId})
+        if not user:
+            raise UnauthorizedException("User associated with this token no longer exists")
+
+        role = user.role.value if hasattr(user.role, "value") else str(user.role)
+        new_tokens = await self._issue_tokens(user.id, role)
+
+        await self.db.refreshtoken.update(
+            where={"id": stored.id},
+            data={
+                "revokedAt": datetime.now(UTC),
+                "replacedByTokenHash": hash_token(new_tokens.refreshToken),
             },
+        )
+
+        return new_tokens
+
+    async def logout(self, user_id: str, dto: RefreshTokenDto) -> None:
+        token_hash = hash_token(dto.refreshToken)
+        stored = await self.db.refreshtoken.find_unique(where={"tokenHash": token_hash})
+        if not stored or stored.userId != user_id:
+            raise UnauthorizedException("Invalid refresh token")
+
+        if stored.revokedAt is None:
+            await self.db.refreshtoken.update(
+                where={"id": stored.id}, data={"revokedAt": datetime.now(UTC)}
+            )
+
+    async def _issue_tokens(self, user_id: str, role: str) -> TokenResponseDto:
+        access_token = create_access_token(subject=user_id, claims={"role": role})
+        refresh_token = generate_refresh_token()
+
+        await self.db.refreshtoken.create(
+            data={
+                "tokenHash": hash_token(refresh_token),
+                "userId": user_id,
+                "expiresAt": datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            }
         )
 
         return TokenResponseDto(
             accessToken=access_token,
+            refreshToken=refresh_token,
             expiresIn=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
 

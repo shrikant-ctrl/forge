@@ -2,7 +2,7 @@
 # Full auth flow. All responses are chained — no copy-pasting.
 #
 # WORKFLOW: Run requests top-to-bottom.
-# The token from Login is automatically used in /me.
+# The token from Login is automatically used in /me, /refresh, and /logout.
 
 @BASE_URL = http://localhost:8000
 
@@ -27,7 +27,7 @@ Content-Type: application/json
 # POST /api/auth/login
 # Run this first — all requests below auto-use this token.
 #
-# 200 → { accessToken, tokenType, expiresIn }
+# 200 → { accessToken, refreshToken, tokenType, expiresIn }
 POST {{BASE_URL}}/api/auth/login
 Content-Type: application/json
 
@@ -39,6 +39,7 @@ Content-Type: application/json
 ###
 # Token is extracted automatically from the Login response above.
 @TOKEN = {{Login.response.body.$.accessToken}}
+@REFRESH_TOKEN = {{Login.response.body.$.refreshToken}}
 
 ###
 # @name GetMyProfile
@@ -50,3 +51,34 @@ Content-Type: application/json
 GET {{BASE_URL}}/api/auth/me
 Authorization: Bearer {{TOKEN}}
 Accept: application/json
+
+###
+# @name Refresh
+# POST /api/auth/refresh
+# Rotates the refresh token from Login for a brand-new access/refresh pair.
+# The old refresh token becomes invalid — reusing it revokes every active
+# session for this user (theft/reuse detection).
+#
+# 200 → { accessToken, refreshToken, tokenType, expiresIn }
+# 401 → Refresh token unknown, expired, or already used
+POST {{BASE_URL}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{REFRESH_TOKEN}}"
+}
+
+###
+# @name Logout
+# POST /api/auth/logout
+# Revokes a refresh token, ending that session. Requires a valid access token.
+#
+# 204 → Refresh token revoked
+# 401 → Refresh token invalid, or does not belong to the authenticated user
+POST {{BASE_URL}}/api/auth/logout
+Authorization: Bearer {{TOKEN}}
+Content-Type: application/json
+
+{
+  "refreshToken": "{{Refresh.response.body.$.refreshToken}}"
+}

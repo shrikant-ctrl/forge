@@ -16,6 +16,7 @@ class LoginDto(BaseModel):
 
 class TokenResponseDto(BaseModel):
     accessToken: str
+    refreshToken: str
     tokenType: str = "Bearer"
     expiresIn: int
 
@@ -30,3 +31,7 @@ class UserDto(BaseModel):
     createdAt: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RefreshTokenDto(BaseModel):
+    refreshToken: str
