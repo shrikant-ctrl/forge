@@ -15,6 +15,7 @@
 # 409 → Email already registered
 POST {{BASE_URL}}/api/auth/register
 Content-Type: application/json
+
 {
   "email": "shrikant@infocusp.com",
   "password": "supersecret123",
