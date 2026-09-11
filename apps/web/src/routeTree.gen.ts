@@ -10,63 +10,118 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AboutRouteImport } from './routes/about'
-import { Route as DemoFormAddressRouteImport } from './routes/demo/form.address'
-import { Route as DemoFormSimpleRouteImport } from './routes/demo/form.simple'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppDriveRouteImport } from './routes/_app/drive'
+import { Route as AppRecentRouteImport } from './routes/_app/recent'
+import { Route as AppSearchRouteImport } from './routes/_app/search'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppDriveFolderIdRouteImport } from './routes/_app/drive.$folderId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DemoFormAddressRoute = DemoFormAddressRouteImport.update({
-  id: '/demo/form/address',
-  path: '/demo/form/address',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DemoFormSimpleRoute = DemoFormSimpleRouteImport.update({
-  id: '/demo/form/simple',
-  path: '/demo/form/simple',
-  getParentRoute: () => rootRouteImport,
+const AppDriveRoute = AppDriveRouteImport.update({
+  id: '/drive',
+  path: '/drive',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRecentRoute = AppRecentRouteImport.update({
+  id: '/recent',
+  path: '/recent',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSearchRoute = AppSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDriveFolderIdRoute = AppDriveFolderIdRouteImport.update({
+  id: '/$folderId',
+  path: '/$folderId',
+  getParentRoute: () => AppDriveRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/demo/form/address': typeof DemoFormAddressRoute
-  '/demo/form/simple': typeof DemoFormSimpleRoute
+  '/login': typeof LoginRoute
+  '/drive': typeof AppDriveRouteWithChildren
+  '/recent': typeof AppRecentRoute
+  '/search': typeof AppSearchRoute
+  '/settings': typeof AppSettingsRoute
+  '/drive/$folderId': typeof AppDriveFolderIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/demo/form/address': typeof DemoFormAddressRoute
-  '/demo/form/simple': typeof DemoFormSimpleRoute
+  '/login': typeof LoginRoute
+  '/drive': typeof AppDriveRouteWithChildren
+  '/recent': typeof AppRecentRoute
+  '/search': typeof AppSearchRoute
+  '/settings': typeof AppSettingsRoute
+  '/drive/$folderId': typeof AppDriveFolderIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/demo/form/address': typeof DemoFormAddressRoute
-  '/demo/form/simple': typeof DemoFormSimpleRoute
+  '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_app/drive': typeof AppDriveRouteWithChildren
+  '/_app/recent': typeof AppRecentRoute
+  '/_app/search': typeof AppSearchRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/drive/$folderId': typeof AppDriveFolderIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/demo/form/address' | '/demo/form/simple'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/drive'
+    | '/recent'
+    | '/search'
+    | '/settings'
+    | '/drive/$folderId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/demo/form/address' | '/demo/form/simple'
-  id: '__root__' | '/' | '/about' | '/demo/form/address' | '/demo/form/simple'
+  to:
+    | '/'
+    | '/login'
+    | '/drive'
+    | '/recent'
+    | '/search'
+    | '/settings'
+    | '/drive/$folderId'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/login'
+    | '/_app/drive'
+    | '/_app/recent'
+    | '/_app/search'
+    | '/_app/settings'
+    | '/_app/drive/$folderId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AboutRoute: typeof AboutRoute
-  DemoFormAddressRoute: typeof DemoFormAddressRoute
-  DemoFormSimpleRoute: typeof DemoFormSimpleRoute
+  AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -78,35 +133,90 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/demo/form/address': {
-      id: '/demo/form/address'
-      path: '/demo/form/address'
-      fullPath: '/demo/form/address'
-      preLoaderRoute: typeof DemoFormAddressRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/demo/form/simple': {
-      id: '/demo/form/simple'
-      path: '/demo/form/simple'
-      fullPath: '/demo/form/simple'
-      preLoaderRoute: typeof DemoFormSimpleRouteImport
-      parentRoute: typeof rootRouteImport
+    '/_app/drive': {
+      id: '/_app/drive'
+      path: '/drive'
+      fullPath: '/drive'
+      preLoaderRoute: typeof AppDriveRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/recent': {
+      id: '/_app/recent'
+      path: '/recent'
+      fullPath: '/recent'
+      preLoaderRoute: typeof AppRecentRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/search': {
+      id: '/_app/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof AppSearchRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/drive/$folderId': {
+      id: '/_app/drive/$folderId'
+      path: '/$folderId'
+      fullPath: '/drive/$folderId'
+      preLoaderRoute: typeof AppDriveFolderIdRouteImport
+      parentRoute: typeof AppDriveRoute
     }
   }
 }
 
+interface AppDriveRouteChildren {
+  AppDriveFolderIdRoute: typeof AppDriveFolderIdRoute
+}
+
+const AppDriveRouteChildren: AppDriveRouteChildren = {
+  AppDriveFolderIdRoute: AppDriveFolderIdRoute,
+}
+
+const AppDriveRouteWithChildren = AppDriveRoute._addFileChildren(
+  AppDriveRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppDriveRoute: typeof AppDriveRouteWithChildren
+  AppRecentRoute: typeof AppRecentRoute
+  AppSearchRoute: typeof AppSearchRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppDriveRoute: AppDriveRouteWithChildren,
+  AppRecentRoute: AppRecentRoute,
+  AppSearchRoute: AppSearchRoute,
+  AppSettingsRoute: AppSettingsRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AboutRoute: AboutRoute,
-  DemoFormAddressRoute: DemoFormAddressRoute,
-  DemoFormSimpleRoute: DemoFormSimpleRoute,
+  AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
