@@ -1,6 +1,4 @@
-import type { FolderResponseDto } from "../../lib/api/types";
-import { useDrive } from "../../lib/drive-store";
-import type { DriveFile } from "../../lib/drive-types";
+import type { FileResponseDto, FolderResponseDto } from "../../lib/api/types";
 import {
 	fileBadgeColor,
 	fileExtensionLabel,
@@ -9,11 +7,12 @@ import {
 } from "../../lib/format";
 import { useUiState } from "../../lib/ui-state/ui-state-store";
 import { FileIcon, FolderIcon } from "../icons";
+import FileLocationLabel from "./FileLocationLabel";
 import ItemMenu from "./ItemMenu";
 
 interface ItemsViewProps {
 	folders: FolderResponseDto[];
-	files: DriveFile[];
+	files: FileResponseDto[];
 	viewMode: "grid" | "list";
 	onOpenFolder: (id: string) => void;
 	showPath?: boolean;
@@ -26,7 +25,6 @@ export default function ItemsView({
 	onOpenFolder,
 	showPath,
 }: ItemsViewProps) {
-	const { breadcrumb } = useDrive();
 	const { openModal } = useUiState();
 
 	if (folders.length === 0 && files.length === 0) {
@@ -36,13 +34,6 @@ export default function ItemsView({
 				<p className="text-sm">Nothing here yet</p>
 			</div>
 		);
-	}
-
-	function pathLabel(folderId: string | null): string {
-		const trail = breadcrumb(folderId);
-		return trail.length
-			? `My Drive / ${trail.map((f) => f.name).join(" / ")}`
-			: "My Drive";
 	}
 
 	if (viewMode === "list") {
@@ -71,7 +62,7 @@ export default function ItemsView({
 								</td>
 								{showPath && (
 									<td className="text-base-content/50">
-										{pathLabel(folder.parentId)}
+										<FileLocationLabel folderId={folder.parentId} />
 									</td>
 								)}
 								<td className="text-base-content/60">
@@ -100,7 +91,7 @@ export default function ItemsView({
 								</td>
 								{showPath && (
 									<td className="text-base-content/50">
-										{pathLabel(file.folderId)}
+										<FileLocationLabel folderId={file.folderId} />
 									</td>
 								)}
 								<td className="text-base-content/60">
@@ -195,7 +186,7 @@ export default function ItemsView({
 						</div>
 						{showPath && (
 							<p className="truncate text-xs text-base-content/40">
-								{pathLabel(file.folderId)}
+								<FileLocationLabel folderId={file.folderId} />
 							</p>
 						)}
 					</div>

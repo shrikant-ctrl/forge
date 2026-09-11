@@ -1,9 +1,9 @@
-import { useDrive } from "../../lib/drive-store";
 import { formatBytes } from "../../lib/format";
+import { useUploads } from "../../lib/uploads/uploads-store";
 
 export default function UploadToasts() {
-	const { uploads } = useDrive();
-	const active = uploads.slice(-5);
+	const { tasks } = useUploads();
+	const active = tasks.slice(-5);
 
 	if (active.length === 0) return null;
 
@@ -24,7 +24,9 @@ export default function UploadToasts() {
 									{formatBytes(task.sizeBytes)}
 								</span>
 							</div>
-							{task.status === "done" ? (
+							{task.status === "error" ? (
+								<div className="badge badge-error badge-sm mt-1">Failed</div>
+							) : task.status === "done" ? (
 								<div className="badge badge-success badge-sm mt-1">Done</div>
 							) : (
 								<progress

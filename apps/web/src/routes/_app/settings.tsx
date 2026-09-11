@@ -1,6 +1,7 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import ThemeToggle from "../../components/ThemeToggle";
-import { useDrive } from "../../lib/drive-store";
+import { meQueryOptions } from "../../lib/auth/queries";
 import { formatBytes } from "../../lib/format";
 
 export const Route = createFileRoute("/_app/settings")({
@@ -8,10 +9,10 @@ export const Route = createFileRoute("/_app/settings")({
 });
 
 function SettingsPage() {
-	const { user, usedStorageBytes, storageQuotaBytes } = useDrive();
+	const { data: user } = useSuspenseQuery(meQueryOptions);
 	const usedPct = Math.min(
 		100,
-		Math.round((usedStorageBytes / storageQuotaBytes) * 100),
+		Math.round((user.usedStorage / user.storageQuota) * 100),
 	);
 
 	return (
@@ -42,10 +43,10 @@ function SettingsPage() {
 						<div className="stat px-0">
 							<div className="stat-title">Used</div>
 							<div className="stat-value text-2xl">
-								{formatBytes(usedStorageBytes)}
+								{formatBytes(user.usedStorage)}
 							</div>
 							<div className="stat-desc">
-								of {formatBytes(storageQuotaBytes)} total
+								of {formatBytes(user.storageQuota)} total
 							</div>
 						</div>
 					</div>

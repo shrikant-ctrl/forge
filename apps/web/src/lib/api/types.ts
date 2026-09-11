@@ -12,3 +12,12 @@ export type FolderDetailResponseDto =
 export type CreateFolderDto = components["schemas"]["CreateFolderDto"];
 export type UpdateFolderDto = components["schemas"]["UpdateFolderDto"];
 export type BreadcrumbDto = components["schemas"]["BreadcrumbDto"];
+
+export type FileResponseDto = components["schemas"]["FileResponseDto"];
+export type InitUploadDto = components["schemas"]["InitUploadDto"];
+export type InitUploadResponseDto =
+	components["schemas"]["InitUploadResponseDto"];
+export type CompleteUploadDto = components["schemas"]["CompleteUploadDto"];
+export type UpdateFileDto = components["schemas"]["UpdateFileDto"];
+export type DownloadUrlResponseDto =
+	components["schemas"]["DownloadUrlResponseDto"];

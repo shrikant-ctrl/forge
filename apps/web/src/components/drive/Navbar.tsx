@@ -1,12 +1,13 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useLogout } from "../../lib/auth/mutations";
-import { useDrive } from "../../lib/drive-store";
+import { meQueryOptions } from "../../lib/auth/queries";
 import { LogoutIcon, SearchIcon, UserIcon } from "../icons";
 import ThemeToggle from "../ThemeToggle";
 
 export default function Navbar() {
-	const { user } = useDrive();
+	const { data: user } = useSuspenseQuery(meQueryOptions);
 	const navigate = useNavigate();
 	const logout = useLogout();
 	const [query, setQuery] = useState("");

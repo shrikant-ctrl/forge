@@ -4,8 +4,8 @@ import Navbar from "../components/drive/Navbar";
 import Sidebar from "../components/drive/Sidebar";
 import UploadToasts from "../components/drive/UploadToasts";
 import { meQueryOptions } from "../lib/auth/queries";
-import { DriveProvider } from "../lib/drive-store";
 import { UiStateProvider } from "../lib/ui-state/ui-state-store";
+import { UploadsProvider } from "../lib/uploads/uploads-store";
 
 export const Route = createFileRoute("/_app")({
 	// ponytail: the backend is Bearer-header-only (no cookies), so the token
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_app")({
 function AppLayout() {
 	return (
 		<UiStateProvider>
-			<DriveProvider>
+			<UploadsProvider>
 				<div className="flex h-screen flex-col">
 					<Navbar />
 					<div className="flex min-h-0 flex-1">
@@ -40,7 +40,7 @@ function AppLayout() {
 				</div>
 				<DriveModals />
 				<UploadToasts />
-			</DriveProvider>
+			</UploadsProvider>
 		</UiStateProvider>
 	);
 }

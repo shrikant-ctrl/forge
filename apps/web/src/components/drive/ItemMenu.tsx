@@ -1,4 +1,5 @@
 import type { DriveItemKind } from "../../lib/drive-types";
+import { useDownloadFile } from "../../lib/files/mutations";
 import { useUiState } from "../../lib/ui-state/ui-state-store";
 import {
 	DotsVerticalIcon,
@@ -23,6 +24,7 @@ export default function ItemMenu({
 	onOpen?: () => void;
 }) {
 	const { openModal } = useUiState();
+	const download = useDownloadFile();
 
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation guard only, not itself interactive
@@ -47,7 +49,13 @@ export default function ItemMenu({
 				)}
 				{kind === "file" && (
 					<li>
-						<button type="button" onClick={closeOpenDropdown}>
+						<button
+							type="button"
+							onClick={() => {
+								closeOpenDropdown();
+								download.mutate({ id });
+							}}
+						>
 							<DownloadIcon className="size-4" /> Download
 						</button>
 					</li>

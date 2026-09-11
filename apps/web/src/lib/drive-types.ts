@@ -1,21 +1,3 @@
-export interface DriveFolder {
-	id: string;
-	name: string;
-	parentId: string | null;
-	createdAt: string;
-	updatedAt: string;
-}
-
-export interface DriveFile {
-	id: string;
-	name: string;
-	folderId: string | null;
-	sizeBytes: number;
-	mimeType: string;
-	createdAt: string;
-	updatedAt: string;
-}
-
 export type DriveItemKind = "folder" | "file";
 
 export type DriveModalState =

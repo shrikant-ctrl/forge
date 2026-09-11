@@ -1,10 +1,15 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import ItemsView from "../../components/drive/ItemsView";
 import ViewToggle from "../../components/drive/ViewToggle";
-import { useDrive } from "../../lib/drive-store";
+import { allFilesQueryOptions } from "../../lib/files/queries";
 import { recencyBucket } from "../../lib/format";
+import { useUiState } from "../../lib/ui-state/ui-state-store";
 
 export const Route = createFileRoute("/_app/recent")({
+	loader: async ({ context }) => {
+		await context.queryClient.ensureQueryData(allFilesQueryOptions());
+	},
 	component: RecentPage,
 });
 
@@ -17,9 +22,10 @@ const BUCKET_ORDER = [
 ];
 
 function RecentPage() {
-	const { recentFiles, viewMode } = useDrive();
+	const filesQuery = useSuspenseQuery(allFilesQueryOptions());
+	const { viewMode } = useUiState();
 	const navigate = useNavigate();
-	const files = recentFiles();
+	const files = filesQuery.data;
 
 	const buckets = new Map<string, typeof files>();
 	for (const file of files) {

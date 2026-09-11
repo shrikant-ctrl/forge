@@ -1,18 +1,21 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useRef } from "react";
-import { useDrive } from "../../lib/drive-store";
+import { meQueryOptions } from "../../lib/auth/queries";
 import { formatBytes } from "../../lib/format";
 import { useUiState } from "../../lib/ui-state/ui-state-store";
+import { useUploads } from "../../lib/uploads/uploads-store";
 import { ClockIcon, FolderIcon, PlusIcon, UploadIcon } from "../icons";
 
 export default function Sidebar() {
-	const { usedStorageBytes, storageQuotaBytes, startUpload } = useDrive();
+	const { data: user } = useSuspenseQuery(meQueryOptions);
+	const { startUpload } = useUploads();
 	const { openModal } = useUiState();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const navigate = useNavigate();
 	const usedPct = Math.min(
 		100,
-		Math.round((usedStorageBytes / storageQuotaBytes) * 100),
+		Math.round((user.usedStorage / user.storageQuota) * 100),
 	);
 
 	return (
@@ -87,7 +90,7 @@ export default function Sidebar() {
 					max={100}
 				/>
 				<p className="mt-1.5 text-xs text-base-content/60">
-					{formatBytes(usedStorageBytes)} of {formatBytes(storageQuotaBytes)}{" "}
+					{formatBytes(user.usedStorage)} of {formatBytes(user.storageQuota)}{" "}
 					used
 				</p>
 			</div>

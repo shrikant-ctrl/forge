@@ -1,9 +1,13 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useDrive } from "../../lib/drive-store";
+import {
+	allFilesQueryOptions,
+	folderFilesQueryOptions,
+} from "../../lib/files/queries";
 import { foldersQueryOptions } from "../../lib/folders/queries";
 import { useUiState } from "../../lib/ui-state/ui-state-store";
+import { useUploads } from "../../lib/uploads/uploads-store";
 import { PlusIcon } from "../icons";
 import Breadcrumbs from "./Breadcrumbs";
 import ItemsView from "./ItemsView";
@@ -14,9 +18,18 @@ export default function DriveBrowser({
 }: {
 	folderId: string | null;
 }) {
-	const { childFiles, startUpload } = useDrive();
+	const { startUpload } = useUploads();
 	const { viewMode, openModal } = useUiState();
 	const foldersQuery = useSuspenseQuery(foldersQueryOptions(folderId));
+	const filesQuery = useSuspenseQuery(
+		folderId === null
+			? allFilesQueryOptions()
+			: folderFilesQueryOptions(folderId),
+	);
+	const files =
+		folderId === null
+			? filesQuery.data.filter((f) => f.folderId === null)
+			: filesQuery.data;
 	const navigate = useNavigate();
 	const [isDragOver, setIsDragOver] = useState(false);
 
@@ -61,7 +74,7 @@ export default function DriveBrowser({
 
 			<ItemsView
 				folders={foldersQuery.data}
-				files={childFiles(folderId)}
+				files={files}
 				viewMode={viewMode}
 				onOpenFolder={goTo}
 			/>

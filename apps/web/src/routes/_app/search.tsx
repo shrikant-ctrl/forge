@@ -1,8 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
 import ItemsView from "../../components/drive/ItemsView";
 import ViewToggle from "../../components/drive/ViewToggle";
-import { useDrive } from "../../lib/drive-store";
+import { searchFilesQueryOptions } from "../../lib/files/queries";
+import { useUiState } from "../../lib/ui-state/ui-state-store";
 
 const searchParamsSchema = z.object({
 	q: z.string().catch(""),
@@ -15,9 +17,13 @@ export const Route = createFileRoute("/_app/search")({
 
 function SearchPage() {
 	const { q } = Route.useSearch();
-	const { searchFiles, viewMode } = useDrive();
+	const { viewMode } = useUiState();
 	const navigate = useNavigate();
-	const results = searchFiles(q);
+	const searchQuery = useQuery({
+		...searchFilesQueryOptions(q),
+		enabled: q.length > 0,
+	});
+	const results = searchQuery.data ?? [];
 
 	return (
 		<div className="flex flex-col gap-6">

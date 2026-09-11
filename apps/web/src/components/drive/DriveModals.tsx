@@ -3,7 +3,12 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { useAppForm } from "../../hooks/form";
 import type { ApiError } from "../../lib/api/errors";
-import { useDrive } from "../../lib/drive-store";
+import {
+	useDeleteFile,
+	useDownloadFile,
+	useUpdateFile,
+} from "../../lib/files/mutations";
+import { fileDetailQueryOptions } from "../../lib/files/queries";
 import {
 	useCreateFolder,
 	useDeleteFolder,
@@ -133,15 +138,19 @@ function RenameForm({
 
 function RenameModal({ kind, id }: { kind: "folder" | "file"; id: string }) {
 	const { closeModal } = useUiState();
-	const { getFile, renameItem } = useDrive();
 	const updateFolder = useUpdateFolder();
+	const updateFile = useUpdateFile();
 	const folderDetail = useQuery({
 		...folderDetailQueryOptions(id),
 		enabled: kind === "folder",
 	});
+	const fileDetail = useQuery({
+		...fileDetailQueryOptions(id),
+		enabled: kind === "file",
+	});
 
 	const currentName =
-		kind === "folder" ? folderDetail.data?.name : getFile(id)?.name;
+		kind === "folder" ? folderDetail.data?.name : fileDetail.data?.name;
 
 	if (currentName === undefined) {
 		return (
@@ -155,7 +164,7 @@ function RenameModal({ kind, id }: { kind: "folder" | "file"; id: string }) {
 
 	function handleSubmit(name: string) {
 		if (kind === "folder") updateFolder.mutate({ id, name });
-		else renameItem("file", id, name);
+		else updateFile.mutate({ id, name });
 		closeModal();
 	}
 
@@ -172,8 +181,8 @@ function RenameModal({ kind, id }: { kind: "folder" | "file"; id: string }) {
 
 function MoveModal({ kind, id }: { kind: "folder" | "file"; id: string }) {
 	const { closeModal } = useUiState();
-	const { moveItem } = useDrive();
 	const updateFolder = useUpdateFolder();
+	const updateFile = useUpdateFile();
 	const [expanded, setExpanded] = useState<Set<string>>(new Set());
 	const [destination, setDestination] = useState<string | null>(null);
 
@@ -189,7 +198,7 @@ function MoveModal({ kind, id }: { kind: "folder" | "file"; id: string }) {
 	function handleSubmit() {
 		if (destination === null) return;
 		if (kind === "folder") updateFolder.mutate({ id, parentId: destination });
-		else moveItem("file", id, destination);
+		else updateFile.mutate({ id, folderId: destination });
 		closeModal();
 	}
 
@@ -228,19 +237,24 @@ function MoveModal({ kind, id }: { kind: "folder" | "file"; id: string }) {
 
 function DeleteModal({ kind, id }: { kind: "folder" | "file"; id: string }) {
 	const { closeModal } = useUiState();
-	const { getFile, deleteItem } = useDrive();
 	const deleteFolder = useDeleteFolder();
+	const deleteFile = useDeleteFile();
 	const folderDetail = useQuery({
 		...folderDetailQueryOptions(id),
 		enabled: kind === "folder",
 	});
+	const fileDetail = useQuery({
+		...fileDetailQueryOptions(id),
+		enabled: kind === "file",
+	});
 
-	const name = kind === "folder" ? folderDetail.data?.name : getFile(id)?.name;
+	const name =
+		kind === "folder" ? folderDetail.data?.name : fileDetail.data?.name;
 	if (name === undefined) return null;
 
 	function handleDelete() {
 		if (kind === "folder") deleteFolder.mutate({ id });
-		else deleteItem("file", id);
+		else deleteFile.mutate({ id });
 		closeModal();
 	}
 
@@ -262,9 +276,10 @@ function DeleteModal({ kind, id }: { kind: "folder" | "file"; id: string }) {
 }
 
 function PreviewModal({ id }: { id: string }) {
-	const { getFile } = useDrive();
 	const { closeModal } = useUiState();
-	const file = getFile(id);
+	const fileDetail = useQuery(fileDetailQueryOptions(id));
+	const download = useDownloadFile();
+	const file = fileDetail.data;
 	if (!file) return null;
 
 	return (
@@ -281,7 +296,8 @@ function PreviewModal({ id }: { id: string }) {
 					<button
 						type="button"
 						className="btn btn-ghost btn-sm"
-						onClick={closeModal}
+						disabled={download.isPending}
+						onClick={() => download.mutate({ id: file.id })}
 					>
 						<DownloadIcon className="size-4" /> Download
 					</button>
