@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useLogout } from "../../lib/auth/mutations";
 import { useDrive } from "../../lib/drive-store";
 import { LogoutIcon, SearchIcon, UserIcon } from "../icons";
 import ThemeToggle from "../ThemeToggle";
@@ -7,6 +8,7 @@ import ThemeToggle from "../ThemeToggle";
 export default function Navbar() {
 	const { user } = useDrive();
 	const navigate = useNavigate();
+	const logout = useLogout();
 	const [query, setQuery] = useState("");
 
 	return (
@@ -65,9 +67,16 @@ export default function Navbar() {
 							</Link>
 						</li>
 						<li>
-							<Link to="/login">
+							<button
+								type="button"
+								onClick={() =>
+									logout.mutate(undefined, {
+										onSuccess: () => navigate({ to: "/login" }),
+									})
+								}
+							>
 								<LogoutIcon className="size-4" /> Sign out
-							</Link>
+							</button>
 						</li>
 					</ul>
 				</div>
