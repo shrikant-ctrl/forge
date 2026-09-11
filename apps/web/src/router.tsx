@@ -13,6 +13,7 @@ export function getRouter() {
 		scrollRestoration: true,
 		defaultPreload: "intent",
 		defaultPreloadStaleTime: 0,
+		defaultNotFoundComponent: () => <div>404 - Page Not Found</div>,
 	});
 
 	setSessionKilledHandler(() => {

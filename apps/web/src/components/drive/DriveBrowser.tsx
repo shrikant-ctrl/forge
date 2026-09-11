@@ -1,6 +1,9 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useDrive } from "../../lib/drive-store";
+import { foldersQueryOptions } from "../../lib/folders/queries";
+import { useUiState } from "../../lib/ui-state/ui-state-store";
 import { PlusIcon } from "../icons";
 import Breadcrumbs from "./Breadcrumbs";
 import ItemsView from "./ItemsView";
@@ -11,24 +14,11 @@ export default function DriveBrowser({
 }: {
 	folderId: string | null;
 }) {
-	const {
-		childFolders,
-		childFiles,
-		viewMode,
-		startUpload,
-		openModal,
-		getFolder,
-	} = useDrive();
+	const { childFiles, startUpload } = useDrive();
+	const { viewMode, openModal } = useUiState();
+	const foldersQuery = useSuspenseQuery(foldersQueryOptions(folderId));
 	const navigate = useNavigate();
 	const [isDragOver, setIsDragOver] = useState(false);
-
-	if (folderId && !getFolder(folderId)) {
-		return (
-			<div className="p-8 text-center text-base-content/60">
-				<p>This folder doesn't exist.</p>
-			</div>
-		);
-	}
 
 	function goTo(id: string | null) {
 		navigate({
@@ -70,7 +60,7 @@ export default function DriveBrowser({
 			</div>
 
 			<ItemsView
-				folders={childFolders(folderId)}
+				folders={foldersQuery.data}
 				files={childFiles(folderId)}
 				viewMode={viewMode}
 				onOpenFolder={goTo}

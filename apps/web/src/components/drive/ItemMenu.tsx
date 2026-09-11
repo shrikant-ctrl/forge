@@ -1,5 +1,5 @@
-import { useDrive } from "../../lib/drive-store";
 import type { DriveItemKind } from "../../lib/drive-types";
+import { useUiState } from "../../lib/ui-state/ui-state-store";
 import {
 	DotsVerticalIcon,
 	DownloadIcon,
@@ -22,7 +22,7 @@ export default function ItemMenu({
 	id: string;
 	onOpen?: () => void;
 }) {
-	const { openModal } = useDrive();
+	const { openModal } = useUiState();
 
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation guard only, not itself interactive

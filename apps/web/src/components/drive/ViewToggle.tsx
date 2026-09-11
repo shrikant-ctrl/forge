@@ -1,8 +1,8 @@
-import { useDrive } from "../../lib/drive-store";
+import { useUiState } from "../../lib/ui-state/ui-state-store";
 import { GridIcon, ListIcon } from "../icons";
 
 export default function ViewToggle() {
-	const { viewMode, setViewMode } = useDrive();
+	const { viewMode, setViewMode } = useUiState();
 
 	return (
 		<div className="join">

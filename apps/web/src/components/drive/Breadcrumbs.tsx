@@ -1,5 +1,5 @@
-import { useDrive } from "../../lib/drive-store";
-import type { DriveFolder } from "../../lib/drive-types";
+import { useQuery } from "@tanstack/react-query";
+import { folderDetailQueryOptions } from "../../lib/folders/queries";
 
 export default function Breadcrumbs({
 	folderId,
@@ -8,8 +8,17 @@ export default function Breadcrumbs({
 	folderId: string | null;
 	onNavigate: (id: string | null) => void;
 }) {
-	const { breadcrumb } = useDrive();
-	const trail: DriveFolder[] = folderId ? breadcrumb(folderId) : [];
+	const detail = useQuery({
+		...folderDetailQueryOptions(folderId ?? ""),
+		enabled: folderId !== null,
+	});
+	const trail =
+		folderId !== null && detail.data
+			? [
+					...detail.data.breadcrumbs,
+					{ id: detail.data.id, name: detail.data.name },
+				]
+			: [];
 
 	return (
 		<div className="breadcrumbs text-sm">

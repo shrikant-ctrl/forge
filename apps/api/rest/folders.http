@@ -72,7 +72,7 @@ Content-Type: application/json
 # 200 → FolderResponseDto[]
 GET {{BASE_URL}}/api/folders
 Authorization: Bearer {{TOKEN}}
-Accept: application/json
+Accept: application/jsonf
 
 ###
 # @name ListFolderChildren

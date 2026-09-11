@@ -1,16 +1,18 @@
+import type { FolderResponseDto } from "../../lib/api/types";
 import { useDrive } from "../../lib/drive-store";
-import type { DriveFile, DriveFolder } from "../../lib/drive-types";
+import type { DriveFile } from "../../lib/drive-types";
 import {
 	fileBadgeColor,
 	fileExtensionLabel,
 	formatBytes,
 	formatRelativeDate,
 } from "../../lib/format";
+import { useUiState } from "../../lib/ui-state/ui-state-store";
 import { FileIcon, FolderIcon } from "../icons";
 import ItemMenu from "./ItemMenu";
 
 interface ItemsViewProps {
-	folders: DriveFolder[];
+	folders: FolderResponseDto[];
 	files: DriveFile[];
 	viewMode: "grid" | "list";
 	onOpenFolder: (id: string) => void;
@@ -24,7 +26,8 @@ export default function ItemsView({
 	onOpenFolder,
 	showPath,
 }: ItemsViewProps) {
-	const { openModal, breadcrumb } = useDrive();
+	const { breadcrumb } = useDrive();
+	const { openModal } = useUiState();
 
 	if (folders.length === 0 && files.length === 0) {
 		return (

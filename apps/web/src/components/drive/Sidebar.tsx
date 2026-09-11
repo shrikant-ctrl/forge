@@ -2,11 +2,12 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useRef } from "react";
 import { useDrive } from "../../lib/drive-store";
 import { formatBytes } from "../../lib/format";
+import { useUiState } from "../../lib/ui-state/ui-state-store";
 import { ClockIcon, FolderIcon, PlusIcon, UploadIcon } from "../icons";
 
 export default function Sidebar() {
-	const { usedStorageBytes, storageQuotaBytes, startUpload, openModal } =
-		useDrive();
+	const { usedStorageBytes, storageQuotaBytes, startUpload } = useDrive();
+	const { openModal } = useUiState();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const navigate = useNavigate();
 	const usedPct = Math.min(
